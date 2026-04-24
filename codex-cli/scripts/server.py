@@ -18,9 +18,7 @@ import uuid
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.error import HTTPError
-from urllib.parse import quote, unquote, urlparse, urlunparse
-from urllib.request import Request, urlopen
+from urllib.parse import quote, unquote, urlparse
 
 try:
     import fcntl
@@ -270,6 +268,7 @@ class App:
         self.host = os.environ.get("CODEX_SERVER_HOST", "0.0.0.0")
         self.port = env_int("CODEX_SERVER_PORT", 7681)
         self.workspace = os.environ.get("CODEX_WORKSPACE", "/config")
+        self.codex_home = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex")))
         self.session_name = os.environ.get("CODEX_SESSION_NAME", "codex-cli")
         self.image_dir = Path(os.environ.get("CODEX_IMAGE_DIR", "/data/codex-images"))
         self.web_dir = Path(os.environ.get("CODEX_WEB_DIR", "/opt/codex-cli-ha/web"))
@@ -307,6 +306,7 @@ class App:
             "workspace": self.workspace,
             "sessionName": self.session_name,
             "imageDir": str(self.image_dir),
+            "authPath": str(self.codex_home / "auth.json"),
             "maxUploadMb": self.max_upload_bytes // 1024 // 1024,
             "fontSize": self.font_size,
             "version": self.version,
@@ -358,53 +358,33 @@ class App:
         self.set_auth_state(state)
         return result
 
-    def forward_callback(self, payload):
-        callback_url = self._extract_callback_url(payload.get("url") or payload.get("callbackUrl") or "")
-        parsed = urlparse(callback_url)
-        hostname = parsed.hostname
+    def upload_auth_json(self, payload):
+        raw_b64 = payload.get("data") or ""
         try:
-            port = parsed.port
-        except ValueError:
-            port = None
-        if parsed.scheme != "http" or hostname not in {"localhost", "127.0.0.1", "::1"}:
-            raise ValueError(self._callback_parse_error(callback_url, parsed, port))
-        if not port:
-            raise ValueError("Callback URL must include the localhost port")
-
-        target = urlunparse(("http", f"127.0.0.1:{port}", parsed.path or "/", "", parsed.query, parsed.fragment))
-        request = Request(target, headers={"Host": f"localhost:{port}", "User-Agent": "codex-cli-ha/0.1"})
+            data = base64.b64decode(raw_b64, validate=True)
+        except Exception as exc:
+            raise ValueError("Invalid auth.json upload data") from exc
+        if len(data) > 1024 * 1024:
+            raise ValueError("auth.json is unexpectedly large")
         try:
-            with urlopen(request, timeout=15) as response:
-                body = response.read(4096).decode("utf-8", errors="replace")
-                status = response.status
-        except HTTPError as exc:
-            body = exc.read(4096).decode("utf-8", errors="replace")
-            status = exc.code
-            if "cancel" in body.lower():
-                raise ValueError(
-                    "Codex rejected the callback as cancelled. Start a new ChatGPT Login and forward the full localhost URL immediately."
-                ) from exc
-        return {"status": status, "body": body}
+            parsed = json.loads(data.decode("utf-8"))
+        except Exception as exc:
+            raise ValueError("Uploaded file is not valid JSON") from exc
+        if not isinstance(parsed, dict):
+            raise ValueError("auth.json must contain a JSON object")
 
-    def _extract_callback_url(self, value):
-        raw = str(value or "").strip()
-        normalized = raw.replace("\r", "").replace("\n", "")
-        decoded = unquote(normalized)
-        for candidate in (normalized, decoded):
-            match = re.search(r"https?://(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?[^\s\"'<>]*", candidate, re.IGNORECASE)
-            if match:
-                return match.group(0)
-        return normalized
-
-    def _callback_parse_error(self, callback_url, parsed, port):
-        preview = callback_url[:90].replace("\n", "\\n").replace("\r", "\\r")
-        if len(callback_url) > 90:
-            preview += "..."
-        return (
-            "Callback URL must be the failed browser URL starting with http://localhost:<port>. "
-            f"Parsed scheme={parsed.scheme or 'none'}, host={parsed.hostname or 'none'}, port={port or 'none'}, "
-            f"starts_with={preview!r}"
-        )
+        self.codex_home.mkdir(parents=True, exist_ok=True)
+        try:
+            os.chmod(self.codex_home, 0o700)
+        except OSError:
+            pass
+        auth_path = self.codex_home / "auth.json"
+        tmp_path = self.codex_home / ".auth.json.tmp"
+        tmp_path.write_bytes(json.dumps(parsed, indent=2).encode("utf-8"))
+        os.chmod(tmp_path, 0o600)
+        tmp_path.replace(auth_path)
+        self.set_auth_state({"type": "authJson", "path": str(auth_path), "uploadedAt": now_ms()})
+        return {"path": str(auth_path)}
 
     def login_status(self):
         try:
@@ -536,8 +516,8 @@ class App:
                         self._json({"ok": True, "image": app.upload_image(payload)})
                     elif parsed.path == "/api/auth/start":
                         self._json({"ok": True, "result": app.start_login(payload)})
-                    elif parsed.path == "/api/auth/callback":
-                        self._json({"ok": True, "result": app.forward_callback(payload)})
+                    elif parsed.path == "/api/auth/upload":
+                        self._json({"ok": True, "result": app.upload_auth_json(payload)})
                     else:
                         self._json({"error": "Not found"}, HTTPStatus.NOT_FOUND)
                 except Exception as exc:

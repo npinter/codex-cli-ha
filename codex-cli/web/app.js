@@ -9,14 +9,15 @@ const el = {
   insertPath: document.getElementById("insertPath"),
   runImage: document.getElementById("runImage"),
   closeImagePanel: document.getElementById("closeImagePanel"),
-  loginChatgpt: document.getElementById("loginChatgpt"),
+  uploadAuth: document.getElementById("uploadAuth"),
   loginDevice: document.getElementById("loginDevice"),
   loginStatus: document.getElementById("loginStatus"),
   authPanel: document.getElementById("authPanel"),
-  authForm: document.getElementById("authForm"),
+  authUploadForm: document.getElementById("authUploadForm"),
   authState: document.getElementById("authState"),
-  callbackUrl: document.getElementById("callbackUrl"),
-  forwardCallback: document.getElementById("forwardCallback"),
+  authFile: document.getElementById("authFile"),
+  authPath: document.getElementById("authPath"),
+  uploadAuthSubmit: document.getElementById("uploadAuthSubmit"),
   closeAuthPanel: document.getElementById("closeAuthPanel"),
   toast: document.getElementById("toast"),
 };
@@ -25,8 +26,6 @@ const state = {
   socket: null,
   latestImage: null,
   terminalReady: false,
-  authStarted: false,
-  callbackUrl: "",
 };
 
 const baseUrl = new URL(window.location.href);
@@ -227,7 +226,6 @@ async function startAuth(type) {
   el.authState.textContent = "Starting login...";
   try {
     const response = await request("api/auth/start", { type });
-    state.authStarted = true;
     renderAuth(response.result);
   } catch (error) {
     el.authState.textContent = error.message;
@@ -235,9 +233,8 @@ async function startAuth(type) {
 }
 
 function renderAuth(auth) {
-  if (auth?.authUrl) {
-    el.authState.innerHTML = `<a href="${auth.authUrl}" target="_blank" rel="noreferrer">Open ChatGPT login</a><br>After sign-in, paste the full failed <code>http://localhost:port/...</code> URL from the browser address bar below.`;
-    window.open(auth.authUrl, "_blank", "noreferrer");
+  if (auth?.type === "authJson") {
+    el.authState.textContent = `auth.json uploaded to ${auth.path}`;
   } else if (auth?.verificationUrl) {
     el.authState.innerHTML = `<a href="${auth.verificationUrl}" target="_blank" rel="noreferrer">Open device login</a><br>Code: <strong>${auth.userCode || ""}</strong>`;
   } else {
@@ -245,7 +242,11 @@ function renderAuth(auth) {
   }
 }
 
-el.loginChatgpt.addEventListener("click", () => startAuth("chatgpt"));
+el.uploadAuth.addEventListener("click", () => {
+  el.authPanel.classList.remove("hidden");
+  el.authState.textContent = "Choose auth.json and upload it.";
+});
+
 el.loginDevice.addEventListener("click", () => startAuth("chatgptDeviceCode"));
 
 el.loginStatus.addEventListener("click", async () => {
@@ -254,39 +255,24 @@ el.loginStatus.addEventListener("click", async () => {
   el.authState.textContent = `${response.status.stdout || ""}${response.status.stderr || ""}`.trim() || `exit ${response.status.code}`;
 });
 
-function readCallbackUrl(form) {
-  const formValue = form ? String(new FormData(form).get("callbackUrl") || "") : "";
-  return (formValue || state.callbackUrl || el.callbackUrl.value || "").trim();
-}
-
-el.callbackUrl.addEventListener("input", () => {
-  state.callbackUrl = el.callbackUrl.value;
-});
-
-el.callbackUrl.addEventListener("paste", () => {
-  window.setTimeout(() => {
-    state.callbackUrl = el.callbackUrl.value;
-  }, 0);
-});
-
-el.authForm.addEventListener("submit", async (event) => {
+el.authUploadForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   el.authPanel.classList.remove("hidden");
-  el.forwardCallback.disabled = true;
+  el.uploadAuthSubmit.disabled = true;
   try {
-    if (!state.authStarted) {
-      throw new Error("Click ChatGPT Login in this add-on UI first, then forward the callback from that login attempt.");
+    const file = el.authFile.files?.[0];
+    if (!file) {
+      throw new Error("Choose an auth.json file first.");
     }
-    const url = readCallbackUrl(event.currentTarget);
-    el.authState.textContent = `Forwarding callback to Codex (${url.length} chars)...`;
-    const response = await request("api/auth/callback", { url, callbackUrl: url });
-    el.authState.textContent = `Callback forwarded. HTTP ${response.result.status}. Click Login Status to verify.`;
-    el.callbackUrl.value = "";
-    state.callbackUrl = "";
+    const data = await fileToBase64(file);
+    el.authState.textContent = `Uploading ${file.name}...`;
+    const response = await request("api/auth/upload", { name: file.name, data });
+    el.authState.textContent = `auth.json uploaded to ${response.result.path}. Restart Codex in the terminal or click Login Status.`;
+    el.authFile.value = "";
   } catch (error) {
     el.authState.textContent = error.message;
   } finally {
-    el.forwardCallback.disabled = false;
+    el.uploadAuthSubmit.disabled = false;
   }
 });
 
@@ -297,8 +283,10 @@ fetch(apiUrl("api/state"))
   .then((snapshot) => {
     el.meta.textContent = `Version: ${snapshot.version || "unknown"} | Workspace: ${snapshot.workspace} | Images: ${snapshot.imageDir}`;
     term.options.fontSize = snapshot.fontSize || 14;
+    if (snapshot.authPath) {
+      el.authPath.textContent = `Target path: ${snapshot.authPath}`;
+    }
     if (snapshot.auth) {
-      state.authStarted = true;
       el.authPanel.classList.remove("hidden");
       renderAuth(snapshot.auth);
     }

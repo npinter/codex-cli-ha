@@ -16,6 +16,7 @@ config_value() {
 
 init_environment() {
     export HOME="/data/home"
+    export CODEX_HOME="${HOME}/.codex"
     export XDG_CONFIG_HOME="/data/.config"
     export XDG_CACHE_HOME="/data/.cache"
     export XDG_STATE_HOME="/data/.local/state"
@@ -23,6 +24,7 @@ init_environment() {
 
     mkdir -p \
         "$HOME" \
+        "$CODEX_HOME" \
         "$XDG_CONFIG_HOME" \
         "$XDG_CACHE_HOME" \
         "$XDG_STATE_HOME" \
@@ -30,6 +32,7 @@ init_environment() {
         "$CODEX_IMAGE_DIR"
 
     chmod 755 "$HOME" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" "$XDG_STATE_HOME" "$XDG_DATA_HOME"
+    chmod 700 "$CODEX_HOME" 2>/dev/null || true
     chmod 700 "$CODEX_IMAGE_DIR" 2>/dev/null || true
 }
 
@@ -67,7 +70,7 @@ main() {
     export CODEX_VENDOR_DIR="/opt/codex-cli-ha/vendor"
     export CODEX_SERVER_HOST="0.0.0.0"
     export CODEX_SERVER_PORT="7681"
-    export CODEX_ADDON_VERSION="0.1.6"
+    export CODEX_ADDON_VERSION="0.1.7"
 
     init_environment
     load_openai_settings

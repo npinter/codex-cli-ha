@@ -33,7 +33,19 @@ codex-image /data/codex-images/example.png "your prompt"
 
 ## Login
 
-Use `ChatGPT Login` in the top bar. If the browser ends on a failed `http://localhost:...` callback page, copy the full URL and paste it into the callback field. The add-on forwards that callback from inside the container so Codex can complete the login.
+Use `Upload auth.json` in the top bar. On a logged-in device, Codex usually stores this file at:
+
+```text
+~/.codex/auth.json
+```
+
+The add-on stores the uploaded file at:
+
+```text
+/data/home/.codex/auth.json
+```
+
+After uploading, restart Codex in the terminal if it was already running.
 
 Device-code login is also available. API-key auth can be configured with `openai_api_key`.
 

@@ -15,7 +15,7 @@
           <p id="meta">Connecting...</p>
         </div>
         <div class="actions">
-          <button id="loginChatgpt" type="button">ChatGPT Login</button>
+          <button id="uploadAuth" type="button">Upload auth.json</button>
           <button id="loginDevice" type="button">Device Login</button>
           <button id="loginStatus" type="button">Login Status</button>
         </div>
@@ -45,16 +45,17 @@
       <aside id="authPanel" class="panel auth hidden">
         <div>
           <strong>Authentication</strong>
-          <p id="authState">Click ChatGPT Login here first. Do not use the terminal's numbered sign-in prompt for this callback forwarder.</p>
+          <p id="authState">Upload an existing Codex auth.json from another machine.</p>
         </div>
-        <form id="authForm">
+        <form id="authUploadForm">
           <label>
-            Full failed localhost callback URL
-            <textarea id="callbackUrl" name="callbackUrl" rows="4" spellcheck="false" placeholder="http://localhost:1455/auth/callback?code=...&state=..."></textarea>
+            Codex auth.json
+            <input id="authFile" name="authFile" type="file" accept="application/json,.json">
           </label>
-          <p class="hint">Flow: click ChatGPT Login above, finish sign-in, then paste the entire failed localhost browser address here. A query string by itself is not enough because Codex needs its localhost port.</p>
+          <p id="authPath" class="hint"></p>
+          <p class="hint">On a logged-in device, this is usually `~/.codex/auth.json`. The add-on stores it at `/data/home/.codex/auth.json`.</p>
           <div class="panel-actions">
-            <button id="forwardCallback" type="submit" class="primary">Forward Callback</button>
+            <button id="uploadAuthSubmit" type="submit" class="primary">Upload</button>
             <button id="closeAuthPanel" type="button">Close</button>
           </div>
         </form>

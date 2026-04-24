@@ -16,7 +16,7 @@ Home Assistant add-on repository for running OpenAI Codex CLI from an ingress pa
 - Native browser image paste/drop support in the terminal page.
 - Pasted images are saved under `/data/codex-images`.
 - The terminal page can insert the saved image path or a generated `codex-image` command.
-- ChatGPT login helper with localhost callback forwarding for Home Assistant ingress.
+- `auth.json` upload helper for copying an existing Codex login into the add-on.
 
 ## Image Paste
 
@@ -26,6 +26,16 @@ Codex CLI currently attaches images through the CLI `--image` option. A browser 
 
 ## Authentication
 
-The panel includes a login helper. If ChatGPT OAuth redirects your browser to a failed `http://localhost:...` page, paste that full callback URL into the helper. The add-on forwards it from inside the container to Codex's local OAuth listener.
+The panel includes an `auth.json` upload helper. On a logged-in device, Codex usually stores this file at:
+
+```text
+~/.codex/auth.json
+```
+
+The add-on stores the uploaded file at:
+
+```text
+/data/home/.codex/auth.json
+```
 
 You can also use an API key in the add-on configuration.
