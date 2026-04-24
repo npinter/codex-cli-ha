@@ -1,13 +1,14 @@
 :root {
   color-scheme: dark;
-  --bg: #090c10;
-  --panel: rgba(18, 24, 34, 0.92);
-  --line: rgba(160, 180, 220, 0.22);
-  --text: #e6edf8;
-  --muted: #9aa8bd;
-  --accent: #ffcc66;
-  --accent-2: #7dcfff;
-  --danger: #ff6b6b;
+  --ha-primary: var(--primary-color, #03a9f4);
+  --ha-accent: var(--accent-color, #00bcd4);
+  --ha-bg: var(--primary-background-color, #111111);
+  --ha-card: var(--card-background-color, #1c1c1c);
+  --ha-text: var(--primary-text-color, #e1e1e1);
+  --ha-secondary-text: var(--secondary-text-color, #9e9e9e);
+  --ha-divider: var(--divider-color, rgba(225, 225, 225, 0.12));
+  --ha-warning: var(--warning-color, #ff9800);
+  --ha-error: var(--error-color, #db4437);
 }
 
 * {
@@ -20,12 +21,9 @@ body {
   height: 100%;
   margin: 0;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 10% 0%, rgba(125, 207, 255, 0.16), transparent 34%),
-    radial-gradient(circle at 80% 10%, rgba(255, 204, 102, 0.14), transparent 30%),
-    linear-gradient(135deg, #080b10 0%, #111820 100%);
-  color: var(--text);
-  font-family: "Aptos", "Segoe UI", sans-serif;
+  background: var(--ha-bg);
+  color: var(--ha-text);
+  font-family: Roboto, "Noto Sans", "Segoe UI", sans-serif;
 }
 
 button,
@@ -35,22 +33,25 @@ textarea {
 }
 
 button {
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  border: 1px solid var(--ha-divider);
+  border-radius: 4px;
   padding: 9px 12px;
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text);
+  background: transparent;
+  color: var(--ha-primary);
   cursor: pointer;
+  font-weight: 500;
+  text-transform: uppercase;
 }
 
 button:hover {
-  border-color: var(--accent);
+  background: rgba(3, 169, 244, 0.08);
+  border-color: var(--ha-primary);
 }
 
 button.primary {
-  background: var(--accent);
-  color: #16120a;
-  border-color: var(--accent);
+  background: var(--ha-primary);
+  color: #ffffff;
+  border-color: var(--ha-primary);
   font-weight: 700;
 }
 
@@ -67,11 +68,10 @@ button.primary {
   justify-content: space-between;
   gap: 16px;
   align-items: center;
-  border: 1px solid var(--line);
-  border-radius: 18px;
+  border: 1px solid var(--ha-divider);
+  border-radius: 4px;
   padding: 12px 14px;
-  background: rgba(10, 14, 20, 0.72);
-  backdrop-filter: blur(18px);
+  background: var(--ha-card);
 }
 
 h1 {
@@ -85,7 +85,7 @@ p {
 }
 
 .topbar p {
-  color: var(--muted);
+  color: var(--ha-secondary-text);
   font-size: 13px;
 }
 
@@ -99,11 +99,11 @@ p {
 .drop-zone {
   position: relative;
   min-height: 0;
-  border: 1px solid var(--line);
-  border-radius: 18px;
+  border: 1px solid var(--ha-divider);
+  border-radius: 4px;
   overflow: hidden;
-  background: #0d1117;
-  box-shadow: 0 22px 80px rgba(0, 0, 0, 0.36);
+  background: #111111;
+  box-shadow: var(--ha-card-box-shadow, 0 2px 4px rgba(0, 0, 0, 0.28));
 }
 
 .terminal {
@@ -117,10 +117,10 @@ p {
   inset: 18px;
   display: none;
   place-items: center;
-  border: 2px dashed var(--accent);
-  border-radius: 16px;
-  background: rgba(9, 12, 16, 0.82);
-  color: var(--accent);
+  border: 2px dashed var(--ha-primary);
+  border-radius: 4px;
+  background: rgba(3, 169, 244, 0.12);
+  color: var(--ha-primary);
   font-size: 22px;
   font-weight: 800;
   pointer-events: none;
@@ -135,12 +135,11 @@ p {
   right: 22px;
   bottom: 22px;
   width: min(430px, calc(100vw - 44px));
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 14px;
-  background: var(--panel);
-  box-shadow: 0 18px 70px rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(20px);
+  border: 1px solid var(--ha-divider);
+  border-radius: 4px;
+  padding: 16px;
+  background: var(--ha-card);
+  box-shadow: var(--ha-card-box-shadow, 0 2px 8px rgba(0, 0, 0, 0.36));
   z-index: 10;
 }
 
@@ -151,8 +150,13 @@ p {
 
 .panel p,
 .panel label {
-  color: var(--muted);
+  color: var(--ha-secondary-text);
   font-size: 13px;
+}
+
+.panel .hint {
+  color: var(--ha-secondary-text);
+  line-height: 1.35;
 }
 
 .panel label {
@@ -164,11 +168,18 @@ p {
 .panel textarea,
 .panel input {
   width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 12px;
+  border: 1px solid var(--ha-divider);
+  border-radius: 4px;
   padding: 10px;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text);
+  background: var(--ha-bg);
+  color: var(--ha-text);
+  resize: vertical;
+}
+
+.panel textarea:focus,
+.panel input:focus {
+  outline: 2px solid var(--ha-primary);
+  outline-offset: 1px;
 }
 
 .panel-actions {
@@ -183,12 +194,12 @@ p {
   left: 50%;
   bottom: 24px;
   transform: translateX(-50%);
-  border: 1px solid var(--line);
-  border-radius: 999px;
+  border: 1px solid var(--ha-divider);
+  border-radius: 4px;
   padding: 9px 14px;
-  background: rgba(10, 14, 20, 0.9);
-  color: var(--text);
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+  background: var(--ha-card);
+  color: var(--ha-text);
+  box-shadow: var(--ha-card-box-shadow, 0 2px 8px rgba(0, 0, 0, 0.36));
   z-index: 20;
 }
 

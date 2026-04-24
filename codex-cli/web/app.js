@@ -37,25 +37,25 @@ const term = new Terminal({
   fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace',
   fontSize: 14,
   theme: {
-    background: "#0d1117",
-    foreground: "#d6e2ff",
-    cursor: "#ffcc66",
-    selectionBackground: "#355070",
-    black: "#0d1117",
-    red: "#ff6b6b",
-    green: "#7bd88f",
-    yellow: "#ffcc66",
-    blue: "#7aa2f7",
-    magenta: "#bb9af7",
-    cyan: "#7dcfff",
-    white: "#d6e2ff",
-    brightBlack: "#5b667a",
-    brightRed: "#ff8585",
-    brightGreen: "#9be7aa",
-    brightYellow: "#ffe08a",
-    brightBlue: "#9ab7ff",
-    brightMagenta: "#d3b6ff",
-    brightCyan: "#9ee7ff",
+    background: "#111111",
+    foreground: "#e1e1e1",
+    cursor: "#03a9f4",
+    selectionBackground: "#175a7a",
+    black: "#111111",
+    red: "#db4437",
+    green: "#43a047",
+    yellow: "#fdd835",
+    blue: "#03a9f4",
+    magenta: "#8e24aa",
+    cyan: "#00bcd4",
+    white: "#e1e1e1",
+    brightBlack: "#727272",
+    brightRed: "#ef5350",
+    brightGreen: "#66bb6a",
+    brightYellow: "#ffee58",
+    brightBlue: "#29b6f6",
+    brightMagenta: "#ab47bc",
+    brightCyan: "#26c6da",
     brightWhite: "#ffffff",
   },
 });
@@ -232,7 +232,7 @@ async function startAuth(type) {
 
 function renderAuth(auth) {
   if (auth?.authUrl) {
-    el.authState.innerHTML = `<a href="${auth.authUrl}" target="_blank" rel="noreferrer">Open ChatGPT login</a><br>After sign-in, paste the failed localhost callback URL below.`;
+    el.authState.innerHTML = `<a href="${auth.authUrl}" target="_blank" rel="noreferrer">Open ChatGPT login</a><br>After sign-in, paste the full failed <code>http://localhost:port/...</code> URL from the browser address bar below.`;
     window.open(auth.authUrl, "_blank", "noreferrer");
   } else if (auth?.verificationUrl) {
     el.authState.innerHTML = `<a href="${auth.verificationUrl}" target="_blank" rel="noreferrer">Open device login</a><br>Code: <strong>${auth.userCode || ""}</strong>`;
@@ -252,7 +252,11 @@ el.loginStatus.addEventListener("click", async () => {
 
 el.forwardCallback.addEventListener("click", async () => {
   try {
-    const response = await request("api/auth/callback", { url: el.callbackUrl.value });
+    const url = el.callbackUrl.value.trim();
+    if (!/^http:\/\/(localhost|127\.0\.0\.1|\[::1\]):\d+\//.test(url)) {
+      throw new Error("Paste the full callback URL starting with http://localhost:<port>/, not just code/state text.");
+    }
+    const response = await request("api/auth/callback", { url });
     el.authState.textContent = `Callback forwarded. HTTP ${response.result.status}`;
     el.callbackUrl.value = "";
   } catch (error) {

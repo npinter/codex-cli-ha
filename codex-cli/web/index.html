@@ -48,9 +48,10 @@
           <p id="authState">Start a login flow.</p>
         </div>
         <label>
-          Failed localhost callback URL
-          <input id="callbackUrl" type="url" placeholder="http://localhost:...">
+          Full failed localhost callback URL
+          <textarea id="callbackUrl" rows="4" spellcheck="false" placeholder="http://localhost:1455/auth/callback?code=...&state=..."></textarea>
         </label>
+        <p class="hint">Paste the entire browser address bar value. A query string by itself is not enough because Codex needs its localhost port.</p>
         <div class="panel-actions">
           <button id="forwardCallback" type="button" class="primary">Forward Callback</button>
           <button id="closeAuthPanel" type="button">Close</button>
