@@ -357,15 +357,20 @@ class App:
         return result
 
     def forward_callback(self, payload):
-        callback_url = (payload.get("url") or "").strip()
+        callback_url = self._extract_callback_url(payload.get("url") or "")
         parsed = urlparse(callback_url)
-        if parsed.scheme != "http" or parsed.hostname not in {"localhost", "127.0.0.1", "::1"}:
-            raise ValueError("Paste the failed http://localhost callback URL from the browser address bar")
-        if not parsed.port:
+        hostname = parsed.hostname
+        try:
+            port = parsed.port
+        except ValueError:
+            port = None
+        if parsed.scheme != "http" or hostname not in {"localhost", "127.0.0.1", "::1"}:
+            raise ValueError(self._callback_parse_error(callback_url, parsed, port))
+        if not port:
             raise ValueError("Callback URL must include the localhost port")
 
-        target = urlunparse(("http", f"127.0.0.1:{parsed.port}", parsed.path or "/", "", parsed.query, parsed.fragment))
-        request = Request(target, headers={"Host": f"localhost:{parsed.port}", "User-Agent": "codex-cli-ha/0.1"})
+        target = urlunparse(("http", f"127.0.0.1:{port}", parsed.path or "/", "", parsed.query, parsed.fragment))
+        request = Request(target, headers={"Host": f"localhost:{port}", "User-Agent": "codex-cli-ha/0.1"})
         try:
             with urlopen(request, timeout=15) as response:
                 body = response.read(4096).decode("utf-8", errors="replace")
@@ -378,6 +383,25 @@ class App:
                     "Codex rejected the callback as cancelled. Start a new ChatGPT Login and forward the full localhost URL immediately."
                 ) from exc
         return {"status": status, "body": body}
+
+    def _extract_callback_url(self, value):
+        raw = str(value or "").strip()
+        decoded = unquote(raw)
+        for candidate in (raw, decoded):
+            match = re.search(r"https?://(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?[^\s\"'<>]*", candidate, re.IGNORECASE)
+            if match:
+                return match.group(0)
+        return raw
+
+    def _callback_parse_error(self, callback_url, parsed, port):
+        preview = callback_url[:90].replace("\n", "\\n").replace("\r", "\\r")
+        if len(callback_url) > 90:
+            preview += "..."
+        return (
+            "Callback URL must be the failed browser URL starting with http://localhost:<port>. "
+            f"Parsed scheme={parsed.scheme or 'none'}, host={parsed.hostname or 'none'}, port={port or 'none'}, "
+            f"starts_with={preview!r}"
+        )
 
     def login_status(self):
         try:

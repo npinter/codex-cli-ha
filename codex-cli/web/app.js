@@ -260,7 +260,7 @@ el.forwardCallback.addEventListener("click", async () => {
       throw new Error("Click ChatGPT Login in this add-on UI first, then forward the callback from that login attempt.");
     }
     const url = el.callbackUrl.value.trim();
-    if (!/^http:\/\/(localhost|127\.0\.0\.1|\[::1\]):\d+\//.test(url)) {
+    if (!/^http:\/\/(localhost|127\.0\.0\.1|\[::1\]):\d+(\/|\?|#|$)/.test(url)) {
       throw new Error("Paste the full callback URL starting with http://localhost:<port>/, not just code/state text.");
     }
     el.authState.textContent = "Forwarding callback to Codex...";
