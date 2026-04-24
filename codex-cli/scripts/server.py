@@ -276,6 +276,7 @@ class App:
         self.vendor_dir = Path(os.environ.get("CODEX_VENDOR_DIR", "/opt/codex-cli-ha/vendor"))
         self.max_upload_bytes = env_int("CODEX_MAX_UPLOAD_MB", 25) * 1024 * 1024
         self.font_size = env_int("CODEX_TERMINAL_FONT_SIZE", 14)
+        self.version = os.environ.get("CODEX_ADDON_VERSION", "0.1.5")
         self.auth = CodexAuthServer(self)
         self.logs = queue.Queue(maxsize=200)
         self.auth_state = None
@@ -308,6 +309,7 @@ class App:
             "imageDir": str(self.image_dir),
             "maxUploadMb": self.max_upload_bytes // 1024 // 1024,
             "fontSize": self.font_size,
+            "version": self.version,
             "auth": self.auth_state,
             "logs": list(self.logs.queue),
         }
@@ -386,12 +388,13 @@ class App:
 
     def _extract_callback_url(self, value):
         raw = str(value or "").strip()
-        decoded = unquote(raw)
-        for candidate in (raw, decoded):
+        normalized = raw.replace("\r", "").replace("\n", "")
+        decoded = unquote(normalized)
+        for candidate in (normalized, decoded):
             match = re.search(r"https?://(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?[^\s\"'<>]*", candidate, re.IGNORECASE)
             if match:
                 return match.group(0)
-        return raw
+        return normalized
 
     def _callback_parse_error(self, callback_url, parsed, port):
         preview = callback_url[:90].replace("\n", "\\n").replace("\r", "\\r")

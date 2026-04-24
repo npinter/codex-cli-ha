@@ -260,9 +260,6 @@ el.forwardCallback.addEventListener("click", async () => {
       throw new Error("Click ChatGPT Login in this add-on UI first, then forward the callback from that login attempt.");
     }
     const url = el.callbackUrl.value.trim();
-    if (!/^http:\/\/(localhost|127\.0\.0\.1|\[::1\]):\d+(\/|\?|#|$)/.test(url)) {
-      throw new Error("Paste the full callback URL starting with http://localhost:<port>/, not just code/state text.");
-    }
     el.authState.textContent = "Forwarding callback to Codex...";
     const response = await request("api/auth/callback", { url });
     el.authState.textContent = `Callback forwarded. HTTP ${response.result.status}. Click Login Status to verify.`;
@@ -279,7 +276,7 @@ el.closeAuthPanel.addEventListener("click", () => el.authPanel.classList.add("hi
 fetch(apiUrl("api/state"))
   .then((response) => response.json())
   .then((snapshot) => {
-    el.meta.textContent = `Workspace: ${snapshot.workspace} | Images: ${snapshot.imageDir}`;
+    el.meta.textContent = `Version: ${snapshot.version || "unknown"} | Workspace: ${snapshot.workspace} | Images: ${snapshot.imageDir}`;
     term.options.fontSize = snapshot.fontSize || 14;
     if (snapshot.auth) {
       state.authStarted = true;

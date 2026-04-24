@@ -1,7 +1,7 @@
 ---
 name: "Codex CLI"
 description: "Codex CLI terminal for Home Assistant with native image paste support"
-version: "0.1.4"
+version: "0.1.5"
 slug: "codex_cli"
 init: false
 
