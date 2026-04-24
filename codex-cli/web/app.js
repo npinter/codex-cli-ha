@@ -24,6 +24,7 @@ const state = {
   socket: null,
   latestImage: null,
   terminalReady: false,
+  authStarted: false,
 };
 
 const baseUrl = new URL(window.location.href);
@@ -224,6 +225,7 @@ async function startAuth(type) {
   el.authState.textContent = "Starting login...";
   try {
     const response = await request("api/auth/start", { type });
+    state.authStarted = true;
     renderAuth(response.result);
   } catch (error) {
     el.authState.textContent = error.message;
@@ -251,16 +253,24 @@ el.loginStatus.addEventListener("click", async () => {
 });
 
 el.forwardCallback.addEventListener("click", async () => {
+  el.authPanel.classList.remove("hidden");
+  el.forwardCallback.disabled = true;
   try {
+    if (!state.authStarted) {
+      throw new Error("Click ChatGPT Login in this add-on UI first, then forward the callback from that login attempt.");
+    }
     const url = el.callbackUrl.value.trim();
     if (!/^http:\/\/(localhost|127\.0\.0\.1|\[::1\]):\d+\//.test(url)) {
       throw new Error("Paste the full callback URL starting with http://localhost:<port>/, not just code/state text.");
     }
+    el.authState.textContent = "Forwarding callback to Codex...";
     const response = await request("api/auth/callback", { url });
-    el.authState.textContent = `Callback forwarded. HTTP ${response.result.status}`;
+    el.authState.textContent = `Callback forwarded. HTTP ${response.result.status}. Click Login Status to verify.`;
     el.callbackUrl.value = "";
   } catch (error) {
     el.authState.textContent = error.message;
+  } finally {
+    el.forwardCallback.disabled = false;
   }
 });
 
@@ -271,6 +281,11 @@ fetch(apiUrl("api/state"))
   .then((snapshot) => {
     el.meta.textContent = `Workspace: ${snapshot.workspace} | Images: ${snapshot.imageDir}`;
     term.options.fontSize = snapshot.fontSize || 14;
+    if (snapshot.auth) {
+      state.authStarted = true;
+      el.authPanel.classList.remove("hidden");
+      renderAuth(snapshot.auth);
+    }
     resizeTerminal();
   })
   .catch(() => {
