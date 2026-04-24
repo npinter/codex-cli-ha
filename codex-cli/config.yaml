@@ -1,0 +1,60 @@
+---
+name: "Codex CLI"
+description: "Codex CLI terminal for Home Assistant with native image paste support"
+version: "0.1.0"
+slug: "codex_cli"
+init: false
+
+arch:
+  - aarch64
+  - amd64
+
+url: "https://github.com/npinter/codex-cli-ha"
+
+ingress: true
+ingress_port: 7681
+ingress_stream: true
+panel_icon: mdi:code-braces
+panel_title: "Codex CLI"
+panel_admin: true
+
+ports:
+  7681/tcp: 7681
+ports_description:
+  7681/tcp: "Codex CLI web terminal (not required for ingress)"
+
+options:
+  auto_launch_codex: true
+  codex_workspace: "/config"
+  codex_session_name: "codex-cli"
+  codex_approval_policy: "on-request"
+  codex_sandbox: "workspace-write"
+  codex_model: ""
+  codex_image_dir: "/data/codex-images"
+  codex_max_upload_mb: 25
+  terminal_font_size: 14
+  openai_api_key: ""
+  openai_base_url: ""
+  openai_organization: ""
+
+schema:
+  auto_launch_codex: bool?
+  codex_workspace: str?
+  codex_session_name: str?
+  codex_approval_policy: str?
+  codex_sandbox: str?
+  codex_model: str?
+  codex_image_dir: str?
+  codex_max_upload_mb: int?
+  terminal_font_size: int?
+  openai_api_key: password?
+  openai_base_url: str?
+  openai_organization: str?
+
+map:
+  - config:rw
+  - share:rw
+
+startup: services
+
+webui: http://[HOST]:[PORT:7681]/

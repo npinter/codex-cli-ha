@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Codex CLI</title>
+    <link rel="stylesheet" href="vendor/xterm.css">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <h1>Codex CLI</h1>
+          <p id="meta">Connecting...</p>
+        </div>
+        <div class="actions">
+          <button id="loginChatgpt" type="button">ChatGPT Login</button>
+          <button id="loginDevice" type="button">Device Login</button>
+          <button id="loginStatus" type="button">Login Status</button>
+        </div>
+      </header>
+
+      <section id="dropZone" class="drop-zone">
+        <div id="terminal" class="terminal"></div>
+        <div id="dropHint" class="drop-hint">Drop image to attach</div>
+      </section>
+
+      <aside id="imagePanel" class="panel hidden">
+        <div>
+          <strong>Pasted image saved</strong>
+          <p id="imagePath"></p>
+        </div>
+        <label>
+          Prompt for Codex
+          <textarea id="imagePrompt" rows="3" placeholder="Ask Codex about the pasted image..."></textarea>
+        </label>
+        <div class="panel-actions">
+          <button id="insertPath" type="button">Insert Path</button>
+          <button id="runImage" type="button" class="primary">Run with Image</button>
+          <button id="closeImagePanel" type="button">Close</button>
+        </div>
+      </aside>
+
+      <aside id="authPanel" class="panel auth hidden">
+        <div>
+          <strong>Authentication</strong>
+          <p id="authState">Start a login flow.</p>
+        </div>
+        <label>
+          Failed localhost callback URL
+          <input id="callbackUrl" type="url" placeholder="http://localhost:...">
+        </label>
+        <div class="panel-actions">
+          <button id="forwardCallback" type="button" class="primary">Forward Callback</button>
+          <button id="closeAuthPanel" type="button">Close</button>
+        </div>
+      </aside>
+
+      <div id="toast" class="toast hidden"></div>
+    </main>
+
+    <script src="vendor/xterm.js"></script>
+    <script src="vendor/xterm-addon-fit.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
