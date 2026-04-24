@@ -148,12 +148,6 @@ p {
   top: 92px;
 }
 
-.panel.links {
-  left: 22px;
-  right: auto;
-  bottom: 22px;
-}
-
 .panel p,
 .panel label {
   color: var(--ha-secondary-text);
@@ -186,34 +180,6 @@ p {
 .panel input:focus {
   outline: 2px solid var(--ha-primary);
   outline-offset: 1px;
-}
-
-.link-list {
-  display: grid;
-  gap: 8px;
-  max-height: 45vh;
-  margin-top: 12px;
-  overflow: auto;
-}
-
-.link-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: center;
-  border: 1px solid var(--ha-divider);
-  border-radius: 4px;
-  padding: 8px;
-}
-
-.link-row a {
-  color: var(--ha-primary);
-  overflow-wrap: anywhere;
-  text-decoration: none;
-}
-
-.link-row a:hover {
-  text-decoration: underline;
 }
 
 .panel-actions {

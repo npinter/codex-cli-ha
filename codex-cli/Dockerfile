@@ -16,12 +16,11 @@ RUN apk add --no-cache \
     vim
 
 RUN npm install -g @openai/codex@latest \
-    && npm install --omit=dev --prefix /tmp/codex-cli-ha-web @xterm/xterm @xterm/addon-fit @xterm/addon-web-links \
+    && npm install --omit=dev --prefix /tmp/codex-cli-ha-web @xterm/xterm @xterm/addon-fit \
     && mkdir -p /opt/codex-cli-ha/vendor \
     && cp /tmp/codex-cli-ha-web/node_modules/@xterm/xterm/css/xterm.css /opt/codex-cli-ha/vendor/xterm.css \
     && cp /tmp/codex-cli-ha-web/node_modules/@xterm/xterm/lib/xterm.js /opt/codex-cli-ha/vendor/xterm.js \
     && cp /tmp/codex-cli-ha-web/node_modules/@xterm/addon-fit/lib/addon-fit.js /opt/codex-cli-ha/vendor/xterm-addon-fit.js \
-    && cp /tmp/codex-cli-ha-web/node_modules/@xterm/addon-web-links/lib/addon-web-links.js /opt/codex-cli-ha/vendor/xterm-addon-web-links.js \
     && rm -rf /tmp/codex-cli-ha-web /root/.npm
 
 WORKDIR /config

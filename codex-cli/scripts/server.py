@@ -18,8 +18,9 @@ import uuid
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import quote, unquote, urlparse
-from urllib.request import urlopen
+from urllib.error import HTTPError
+from urllib.parse import quote, unquote, urlparse, urlunparse
+from urllib.request import Request, urlopen
 
 try:
     import fcntl
@@ -356,15 +357,26 @@ class App:
         return result
 
     def forward_callback(self, payload):
-        callback_url = payload.get("url", "")
+        callback_url = (payload.get("url") or "").strip()
         parsed = urlparse(callback_url)
         if parsed.scheme != "http" or parsed.hostname not in {"localhost", "127.0.0.1", "::1"}:
             raise ValueError("Paste the failed http://localhost callback URL from the browser address bar")
         if not parsed.port:
             raise ValueError("Callback URL must include the localhost port")
-        with urlopen(callback_url, timeout=15) as response:
-            body = response.read(4096).decode("utf-8", errors="replace")
-            status = response.status
+
+        target = urlunparse(("http", f"127.0.0.1:{parsed.port}", parsed.path or "/", "", parsed.query, parsed.fragment))
+        request = Request(target, headers={"Host": f"localhost:{parsed.port}", "User-Agent": "codex-cli-ha/0.1"})
+        try:
+            with urlopen(request, timeout=15) as response:
+                body = response.read(4096).decode("utf-8", errors="replace")
+                status = response.status
+        except HTTPError as exc:
+            body = exc.read(4096).decode("utf-8", errors="replace")
+            status = exc.code
+            if "cancel" in body.lower():
+                raise ValueError(
+                    "Codex rejected the callback as cancelled. Start a new ChatGPT Login and forward the full localhost URL immediately."
+                ) from exc
         return {"status": status, "body": body}
 
     def login_status(self):
@@ -478,8 +490,6 @@ class App:
                     self._serve_file(app.vendor_dir / "xterm.js", "application/javascript; charset=utf-8")
                 elif path == "/vendor/xterm-addon-fit.js":
                     self._serve_file(app.vendor_dir / "xterm-addon-fit.js", "application/javascript; charset=utf-8")
-                elif path == "/vendor/xterm-addon-web-links.js":
-                    self._serve_file(app.vendor_dir / "xterm-addon-web-links.js", "application/javascript; charset=utf-8")
                 elif path == "/api/state":
                     self._json(app.snapshot())
                 elif path == "/api/auth/status":
