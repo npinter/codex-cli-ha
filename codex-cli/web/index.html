@@ -15,6 +15,9 @@
           <p id="meta">Connecting...</p>
         </div>
         <div class="actions">
+          <button id="copySelection" type="button">Copy Selection</button>
+          <button id="copyScreen" type="button">Copy Screen</button>
+          <button id="showLinks" type="button">Links</button>
           <button id="loginChatgpt" type="button">ChatGPT Login</button>
           <button id="loginDevice" type="button">Device Login</button>
           <button id="loginStatus" type="button">Login Status</button>
@@ -58,11 +61,23 @@
         </div>
       </aside>
 
+      <aside id="linkPanel" class="panel links hidden">
+        <div>
+          <strong>Detected Links</strong>
+          <p>Links seen in terminal output. Use this on mobile if tapping terminal links is unreliable.</p>
+        </div>
+        <div id="linkList" class="link-list"></div>
+        <div class="panel-actions">
+          <button id="closeLinkPanel" type="button">Close</button>
+        </div>
+      </aside>
+
       <div id="toast" class="toast hidden"></div>
     </main>
 
     <script src="vendor/xterm.js"></script>
     <script src="vendor/xterm-addon-fit.js"></script>
+    <script src="vendor/xterm-addon-web-links.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

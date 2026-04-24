@@ -9,6 +9,12 @@ const el = {
   insertPath: document.getElementById("insertPath"),
   runImage: document.getElementById("runImage"),
   closeImagePanel: document.getElementById("closeImagePanel"),
+  copySelection: document.getElementById("copySelection"),
+  copyScreen: document.getElementById("copyScreen"),
+  showLinks: document.getElementById("showLinks"),
+  linkPanel: document.getElementById("linkPanel"),
+  linkList: document.getElementById("linkList"),
+  closeLinkPanel: document.getElementById("closeLinkPanel"),
   loginChatgpt: document.getElementById("loginChatgpt"),
   loginDevice: document.getElementById("loginDevice"),
   loginStatus: document.getElementById("loginStatus"),
@@ -24,6 +30,7 @@ const state = {
   socket: null,
   latestImage: null,
   terminalReady: false,
+  links: [],
 };
 
 const baseUrl = new URL(window.location.href);
@@ -62,6 +69,14 @@ const term = new Terminal({
 
 const fit = new FitAddon.FitAddon();
 term.loadAddon(fit);
+if (window.WebLinksAddon?.WebLinksAddon) {
+  term.loadAddon(
+    new WebLinksAddon.WebLinksAddon((event, uri) => {
+      event.preventDefault();
+      openLink(uri);
+    }),
+  );
+}
 term.open(el.terminal);
 fit.fit();
 
@@ -97,6 +112,7 @@ function connectTerminal() {
   });
 
   socket.addEventListener("message", (event) => {
+    collectLinks(event.data);
     term.write(event.data);
   });
 
@@ -135,6 +151,84 @@ function showToast(message) {
   el.toast.classList.remove("hidden");
   window.clearTimeout(showToast.timer);
   showToast.timer = window.setTimeout(() => el.toast.classList.add("hidden"), 3500);
+}
+
+async function copyText(text, emptyMessage) {
+  if (!text) {
+    showToast(emptyMessage);
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast("Copied");
+  } catch {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.top = "-1000px";
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    textarea.remove();
+    showToast("Copied");
+  }
+}
+
+function getScreenText() {
+  const buffer = term.buffer.active;
+  const lines = [];
+  const start = Math.max(0, buffer.baseY);
+  const end = buffer.baseY + buffer.rows;
+  for (let index = start; index < end; index += 1) {
+    const line = buffer.getLine(index);
+    if (line) lines.push(line.translateToString(true));
+  }
+  return lines.join("\n").trim();
+}
+
+function collectLinks(text) {
+  const matches = String(text).match(/https?:\/\/[^\s<>"')\]]+/g) || [];
+  for (const raw of matches) {
+    const url = raw.replace(/[.,;:!?]+$/, "");
+    if (!state.links.some((item) => item.url === url)) {
+      state.links.unshift({ url, time: Date.now() });
+    }
+  }
+  state.links = state.links.slice(0, 20);
+  renderLinks();
+}
+
+function renderLinks() {
+  if (!state.links.length) {
+    el.linkList.innerHTML = '<p class="hint">No links detected yet.</p>';
+    return;
+  }
+  el.linkList.innerHTML = state.links
+    .map((item) => `
+      <div class="link-row">
+        <a href="${escapeAttribute(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.url)}</a>
+        <button type="button" data-copy-link="${escapeAttribute(item.url)}">Copy</button>
+      </div>
+    `)
+    .join("");
+}
+
+function openLink(url) {
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value);
 }
 
 async function fileToBase64(file) {
@@ -218,6 +312,27 @@ el.runImage.addEventListener("click", () => {
 });
 
 el.closeImagePanel.addEventListener("click", () => el.imagePanel.classList.add("hidden"));
+
+el.copySelection.addEventListener("click", () => {
+  copyText(term.getSelection(), "No terminal text selected");
+});
+
+el.copyScreen.addEventListener("click", () => {
+  copyText(getScreenText(), "Terminal screen is empty");
+});
+
+el.showLinks.addEventListener("click", () => {
+  renderLinks();
+  el.linkPanel.classList.remove("hidden");
+});
+
+el.closeLinkPanel.addEventListener("click", () => el.linkPanel.classList.add("hidden"));
+
+el.linkList.addEventListener("click", (event) => {
+  const url = event.target.dataset.copyLink;
+  if (!url) return;
+  copyText(url, "No link");
+});
 
 async function startAuth(type) {
   el.authPanel.classList.remove("hidden");

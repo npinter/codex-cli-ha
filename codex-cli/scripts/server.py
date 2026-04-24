@@ -478,6 +478,8 @@ class App:
                     self._serve_file(app.vendor_dir / "xterm.js", "application/javascript; charset=utf-8")
                 elif path == "/vendor/xterm-addon-fit.js":
                     self._serve_file(app.vendor_dir / "xterm-addon-fit.js", "application/javascript; charset=utf-8")
+                elif path == "/vendor/xterm-addon-web-links.js":
+                    self._serve_file(app.vendor_dir / "xterm-addon-web-links.js", "application/javascript; charset=utf-8")
                 elif path == "/api/state":
                     self._json(app.snapshot())
                 elif path == "/api/auth/status":
