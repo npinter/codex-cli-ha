@@ -47,15 +47,17 @@
           <strong>Authentication</strong>
           <p id="authState">Click ChatGPT Login here first. Do not use the terminal's numbered sign-in prompt for this callback forwarder.</p>
         </div>
-        <label>
-          Full failed localhost callback URL
-          <textarea id="callbackUrl" rows="4" spellcheck="false" placeholder="http://localhost:1455/auth/callback?code=...&state=..."></textarea>
-        </label>
-        <p class="hint">Flow: click ChatGPT Login above, finish sign-in, then paste the entire failed localhost browser address here. A query string by itself is not enough because Codex needs its localhost port.</p>
-        <div class="panel-actions">
-          <button id="forwardCallback" type="button" class="primary">Forward Callback</button>
-          <button id="closeAuthPanel" type="button">Close</button>
-        </div>
+        <form id="authForm">
+          <label>
+            Full failed localhost callback URL
+            <textarea id="callbackUrl" name="callbackUrl" rows="4" spellcheck="false" placeholder="http://localhost:1455/auth/callback?code=...&state=..."></textarea>
+          </label>
+          <p class="hint">Flow: click ChatGPT Login above, finish sign-in, then paste the entire failed localhost browser address here. A query string by itself is not enough because Codex needs its localhost port.</p>
+          <div class="panel-actions">
+            <button id="forwardCallback" type="submit" class="primary">Forward Callback</button>
+            <button id="closeAuthPanel" type="button">Close</button>
+          </div>
+        </form>
       </aside>
 
       <div id="toast" class="toast hidden"></div>

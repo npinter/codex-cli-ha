@@ -359,7 +359,7 @@ class App:
         return result
 
     def forward_callback(self, payload):
-        callback_url = self._extract_callback_url(payload.get("url") or "")
+        callback_url = self._extract_callback_url(payload.get("url") or payload.get("callbackUrl") or "")
         parsed = urlparse(callback_url)
         hostname = parsed.hostname
         try:

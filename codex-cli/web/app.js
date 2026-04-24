@@ -13,6 +13,7 @@ const el = {
   loginDevice: document.getElementById("loginDevice"),
   loginStatus: document.getElementById("loginStatus"),
   authPanel: document.getElementById("authPanel"),
+  authForm: document.getElementById("authForm"),
   authState: document.getElementById("authState"),
   callbackUrl: document.getElementById("callbackUrl"),
   forwardCallback: document.getElementById("forwardCallback"),
@@ -25,6 +26,7 @@ const state = {
   latestImage: null,
   terminalReady: false,
   authStarted: false,
+  callbackUrl: "",
 };
 
 const baseUrl = new URL(window.location.href);
@@ -252,18 +254,35 @@ el.loginStatus.addEventListener("click", async () => {
   el.authState.textContent = `${response.status.stdout || ""}${response.status.stderr || ""}`.trim() || `exit ${response.status.code}`;
 });
 
-el.forwardCallback.addEventListener("click", async () => {
+function readCallbackUrl(form) {
+  const formValue = form ? String(new FormData(form).get("callbackUrl") || "") : "";
+  return (formValue || state.callbackUrl || el.callbackUrl.value || "").trim();
+}
+
+el.callbackUrl.addEventListener("input", () => {
+  state.callbackUrl = el.callbackUrl.value;
+});
+
+el.callbackUrl.addEventListener("paste", () => {
+  window.setTimeout(() => {
+    state.callbackUrl = el.callbackUrl.value;
+  }, 0);
+});
+
+el.authForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
   el.authPanel.classList.remove("hidden");
   el.forwardCallback.disabled = true;
   try {
     if (!state.authStarted) {
       throw new Error("Click ChatGPT Login in this add-on UI first, then forward the callback from that login attempt.");
     }
-    const url = el.callbackUrl.value.trim();
-    el.authState.textContent = "Forwarding callback to Codex...";
-    const response = await request("api/auth/callback", { url });
+    const url = readCallbackUrl(event.currentTarget);
+    el.authState.textContent = `Forwarding callback to Codex (${url.length} chars)...`;
+    const response = await request("api/auth/callback", { url, callbackUrl: url });
     el.authState.textContent = `Callback forwarded. HTTP ${response.result.status}. Click Login Status to verify.`;
     el.callbackUrl.value = "";
+    state.callbackUrl = "";
   } catch (error) {
     el.authState.textContent = error.message;
   } finally {
