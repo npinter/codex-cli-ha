@@ -65,6 +65,10 @@ Device-code login can still be run inside the terminal if needed. API-key auth c
 - `Restart HA`: Restarts Home Assistant Core through the Supervisor API.
 - `Rate limit`: Polls Codex app-server's `account/rateLimits/read` method every 60 seconds when credentials are available.
 
+## Mobile Controls
+
+The control strip below the header provides runtime terminal text scaling, arrow up/down keys for command history, and terminal scrollback buttons. Text size changes are stored in the browser, so the Home Assistant companion app can use a different size than desktop.
+
 ## Codex CLI Version
 
 The Docker build installs Codex CLI with `npm install -g @openai/codex`.

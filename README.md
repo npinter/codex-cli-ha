@@ -24,6 +24,7 @@ Or add it manually:
 - The terminal page inserts the saved image path with `Insert Path`, or directly from `Alt+V` when browser clipboard access is allowed.
 - `auth.json` upload helper for copying an existing Codex login into the add-on.
 - Header actions for Codex rate limits, image paste, Home Assistant YAML reload, and Home Assistant restart.
+- Mobile-friendly terminal controls for text size, arrow up/down keys, and terminal scrollback.
 - Docker build installs Codex CLI with `npm install -g @openai/codex`.
 
 ## Image Paste

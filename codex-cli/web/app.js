@@ -20,9 +20,24 @@ const el = {
   authPath: document.getElementById("authPath"),
   uploadAuthSubmit: document.getElementById("uploadAuthSubmit"),
   closeAuthPanel: document.getElementById("closeAuthPanel"),
+  fontDown: document.getElementById("fontDown"),
+  fontSizeValue: document.getElementById("fontSizeValue"),
+  fontUp: document.getElementById("fontUp"),
+  keyUp: document.getElementById("keyUp"),
+  keyDown: document.getElementById("keyDown"),
+  scrollUp: document.getElementById("scrollUp"),
+  scrollDown: document.getElementById("scrollDown"),
+  scrollBottom: document.getElementById("scrollBottom"),
   toast: document.getElementById("toast"),
   pasteCatcher: document.getElementById("pasteCatcher"),
 };
+
+const DEFAULT_FONT_SIZE = 14;
+const FONT_SIZE_KEY = "codex-cli-ha-terminal-font-size";
+const MIN_FONT_SIZE = 9;
+const MAX_FONT_SIZE = 28;
+
+const storedFontSize = readStoredFontSize();
 
 const state = {
   socket: null,
@@ -30,6 +45,8 @@ const state = {
   terminalReady: false,
   pasteCaptureActive: false,
   pasteCaptureTimer: null,
+  fontSize: storedFontSize || DEFAULT_FONT_SIZE,
+  hasStoredFontSize: storedFontSize !== null,
 };
 
 const UPLOAD_IMAGE_TYPES = new Set(["image/gif", "image/jpeg", "image/png", "image/webp"]);
@@ -49,7 +66,7 @@ const term = new Terminal({
   cursorBlink: true,
   convertEol: true,
   fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace',
-  fontSize: 14,
+  fontSize: state.fontSize,
   theme: {
     background: "#111111",
     foreground: "#e1e1e1",
@@ -77,6 +94,7 @@ const term = new Terminal({
 const fit = new FitAddon.FitAddon();
 term.loadAddon(fit);
 term.open(el.terminal);
+renderFontSize();
 fit.fit();
 term.attachCustomKeyEventHandler((event) => {
   if (event.type === "keydown" && event.altKey && event.key.toLowerCase() === "v") {
@@ -157,6 +175,55 @@ function resizeTerminal() {
 
 term.onData((data) => sendTerminal(data));
 window.addEventListener("resize", resizeTerminal);
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", resizeTerminal);
+}
+
+function readStoredFontSize() {
+  try {
+    const value = window.localStorage.getItem(FONT_SIZE_KEY);
+    const parsed = Number.parseInt(value, 10);
+    return validFontSize(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistFontSize(size) {
+  try {
+    window.localStorage.setItem(FONT_SIZE_KEY, String(size));
+  } catch {
+    // Browser storage can be disabled in some embedded WebViews.
+  }
+}
+
+function validFontSize(size) {
+  return Number.isInteger(size) && size >= MIN_FONT_SIZE && size <= MAX_FONT_SIZE;
+}
+
+function clampFontSize(size) {
+  const parsed = Number.parseInt(size, 10);
+  if (!Number.isFinite(parsed)) return DEFAULT_FONT_SIZE;
+  return Math.max(MIN_FONT_SIZE, Math.min(MAX_FONT_SIZE, parsed));
+}
+
+function renderFontSize() {
+  el.fontSizeValue.textContent = `${state.fontSize}px`;
+  el.fontDown.disabled = state.fontSize <= MIN_FONT_SIZE;
+  el.fontUp.disabled = state.fontSize >= MAX_FONT_SIZE;
+}
+
+function setTerminalFontSize(size, options = {}) {
+  const nextSize = clampFontSize(size);
+  state.fontSize = nextSize;
+  term.options.fontSize = nextSize;
+  if (options.persist) {
+    state.hasStoredFontSize = true;
+    persistFontSize(nextSize);
+  }
+  renderFontSize();
+  window.requestAnimationFrame(resizeTerminal);
+}
 
 function showToast(message) {
   el.toast.textContent = message;
@@ -437,6 +504,27 @@ el.authUploadForm.addEventListener("submit", async (event) => {
 
 el.closeAuthPanel.addEventListener("click", () => el.authPanel.classList.add("hidden"));
 
+el.fontDown.addEventListener("click", () => setTerminalFontSize(state.fontSize - 1, { persist: true }));
+el.fontUp.addEventListener("click", () => setTerminalFontSize(state.fontSize + 1, { persist: true }));
+
+el.keyUp.addEventListener("click", () => sendTerminal("\x1b[A"));
+el.keyDown.addEventListener("click", () => sendTerminal("\x1b[B"));
+
+el.scrollUp.addEventListener("click", () => {
+  term.scrollPages(-1);
+  term.focus();
+});
+
+el.scrollDown.addEventListener("click", () => {
+  term.scrollPages(1);
+  term.focus();
+});
+
+el.scrollBottom.addEventListener("click", () => {
+  term.scrollToBottom();
+  term.focus();
+});
+
 async function refreshRateLimit() {
   try {
     const response = await fetch(apiUrl("api/rate-limits")).then((item) => item.json());
@@ -452,7 +540,11 @@ fetch(apiUrl("api/state"))
   .then((snapshot) => {
     el.title.textContent = "Codex CLI";
     el.rateLimit.textContent = snapshot.rateLimitsSummary || "Rate limit: loading...";
-    term.options.fontSize = snapshot.fontSize || 14;
+    if (!state.hasStoredFontSize) {
+      setTerminalFontSize(snapshot.fontSize || DEFAULT_FONT_SIZE);
+    } else {
+      setTerminalFontSize(state.fontSize);
+    }
     if (snapshot.authPath) {
       el.authPath.textContent = `Target path: ${snapshot.authPath}`;
     }
