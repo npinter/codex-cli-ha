@@ -1,5 +1,5 @@
 const el = {
-  meta: document.getElementById("meta"),
+  title: document.getElementById("title"),
   terminal: document.getElementById("terminal"),
   dropZone: document.getElementById("dropZone"),
   dropHint: document.getElementById("dropHint"),
@@ -22,12 +22,15 @@ const el = {
   uploadAuthSubmit: document.getElementById("uploadAuthSubmit"),
   closeAuthPanel: document.getElementById("closeAuthPanel"),
   toast: document.getElementById("toast"),
+  pasteCatcher: document.getElementById("pasteCatcher"),
 };
 
 const state = {
   socket: null,
   latestImage: null,
   terminalReady: false,
+  pasteCaptureActive: false,
+  pasteCaptureTimer: null,
 };
 
 const baseUrl = new URL(window.location.href);
@@ -71,7 +74,7 @@ fit.fit();
 term.attachCustomKeyEventHandler((event) => {
   if (event.type === "keydown" && event.altKey && event.key.toLowerCase() === "v") {
     event.preventDefault();
-    pasteImageFromClipboard();
+    requestImagePaste();
     return false;
   }
   return true;
@@ -171,11 +174,27 @@ async function uploadImage(file) {
   showToast(`Image saved: ${response.image.name}`);
 }
 
-async function pasteImageFromClipboard() {
-  if (!navigator.clipboard?.read) {
-    showToast("Browser clipboard image access is unavailable. Use normal paste or drop.");
+function armPasteCapture(message) {
+  state.pasteCaptureActive = true;
+  window.clearTimeout(state.pasteCaptureTimer);
+  el.pasteCatcher.textContent = "";
+  el.pasteCatcher.focus({ preventScroll: true });
+  state.pasteCaptureTimer = window.setTimeout(() => {
+    state.pasteCaptureActive = false;
+    term.focus();
+  }, 15000);
+  showToast(message);
+}
+
+async function requestImagePaste() {
+  if (!navigator.clipboard?.read || !window.isSecureContext) {
+    armPasteCapture("Paste the image now with Ctrl+V or the browser paste action.");
     return;
   }
+  await pasteImageFromClipboard(true);
+}
+
+async function pasteImageFromClipboard(allowPasteFallback = false) {
   try {
     const items = await navigator.clipboard.read();
     const files = [];
@@ -191,6 +210,10 @@ async function pasteImageFromClipboard() {
     }
     await handleFiles(files);
   } catch (error) {
+    if (allowPasteFallback) {
+      armPasteCapture("Clipboard read was blocked. Paste the image now with Ctrl+V or the browser paste action.");
+      return;
+    }
     showToast(`Browser clipboard read failed: ${error.message}`);
   }
 }
@@ -208,6 +231,11 @@ function collectImageFilesFromPaste(event) {
       if (file) files.push(file);
     }
   }
+  for (const file of Array.from(event.clipboardData?.files || [])) {
+    if (file.type.startsWith("image/") && !files.includes(file)) {
+      files.push(file);
+    }
+  }
   return files;
 }
 
@@ -221,10 +249,20 @@ async function handleFiles(files) {
 
 document.addEventListener("paste", (event) => {
   const files = collectImageFilesFromPaste(event);
-  if (!files.length) return;
+  if (!files.length) {
+    if (state.pasteCaptureActive) {
+      state.pasteCaptureActive = false;
+      window.clearTimeout(state.pasteCaptureTimer);
+      showToast("Clipboard does not contain an image.");
+      term.focus();
+    }
+    return;
+  }
   event.preventDefault();
+  state.pasteCaptureActive = false;
+  window.clearTimeout(state.pasteCaptureTimer);
   handleFiles(files).catch((error) => showToast(error.message));
-});
+}, true);
 
 el.dropZone.addEventListener("dragover", (event) => {
   event.preventDefault();
@@ -268,7 +306,7 @@ el.uploadAuth.addEventListener("click", () => {
   el.authState.textContent = "Choose auth.json and upload it.";
 });
 
-el.pasteImage.addEventListener("click", () => pasteImageFromClipboard());
+el.pasteImage.addEventListener("click", () => requestImagePaste());
 
 el.reloadYaml.addEventListener("click", async () => {
   el.reloadYaml.disabled = true;
@@ -332,7 +370,7 @@ async function refreshRateLimit() {
 fetch(apiUrl("api/state"))
   .then((response) => response.json())
   .then((snapshot) => {
-    el.meta.textContent = `Version: ${snapshot.version || "unknown"} | Workspace: ${snapshot.workspace} | Images: ${snapshot.imageDir}`;
+    el.title.textContent = `Codex CLI (v${snapshot.version || "unknown"})`;
     el.rateLimit.textContent = snapshot.rateLimitsSummary || "Rate limit: loading...";
     term.options.fontSize = snapshot.fontSize || 14;
     if (snapshot.authPath) {
@@ -345,7 +383,8 @@ fetch(apiUrl("api/state"))
     resizeTerminal();
   })
   .catch(() => {
-    el.meta.textContent = "State unavailable";
+    el.title.textContent = "Codex CLI";
+    el.rateLimit.textContent = "Rate limit: unavailable";
   });
 
 connectTerminal();

@@ -17,11 +17,12 @@ Home Assistant add-on repository for running OpenAI Codex CLI from an ingress pa
 - Pasted images are saved under `/data/codex-images`.
 - The terminal page can insert the saved image path or a generated `codex-image` command.
 - `auth.json` upload helper for copying an existing Codex login into the add-on.
-- Header actions for Codex rate limits, browser clipboard image paste, Home Assistant YAML reload, and Home Assistant restart.
+- Header actions for Codex rate limits, image paste, Home Assistant YAML reload, and Home Assistant restart.
+- Docker build pins Codex CLI to `@openai/codex@0.125.0`.
 
 ## Image Paste
 
-Paste or drop an image anywhere on the Codex CLI panel, or press `Alt+V` / click `Paste Image`. The add-on reads the browser clipboard, saves the image inside the container, and inserts the saved path into the terminal. You can also use the `Run with image` prompt to start/resume Codex with that image attached.
+Paste or drop an image anywhere on the Codex CLI panel. The add-on captures the browser paste event before xterm, saves the image inside the container, and inserts the saved path into the terminal. `Alt+V` / the paste icon uses the browser Clipboard API when available; if the browser blocks it, the page arms a paste target and asks you to paste with `Ctrl+V` or the browser paste action.
 
 Codex CLI currently attaches images through the CLI `--image` option. A browser terminal cannot change Codex internals while an already-running TUI is waiting for input, so this add-on implements the reliable part natively in the terminal page: clipboard image capture, upload, persistent storage, and terminal command insertion.
 

@@ -579,6 +579,8 @@ class App:
                     self._serve_file(app.vendor_dir / "xterm.js", "application/javascript; charset=utf-8")
                 elif path == "/vendor/xterm-addon-fit.js":
                     self._serve_file(app.vendor_dir / "xterm-addon-fit.js", "application/javascript; charset=utf-8")
+                elif path.startswith("/vendor/fontawesome/"):
+                    self._serve_vendor_asset(path.removeprefix("/vendor/fontawesome/"))
                 elif path == "/api/state":
                     self._json(app.snapshot())
                 elif path == "/api/rate-limits":
@@ -637,6 +639,29 @@ class App:
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers()
                 self.wfile.write(data)
+
+            def _serve_vendor_asset(self, encoded_name):
+                name = unquote(encoded_name)
+                if name.startswith("/") or "\\" in name or ".." in Path(name).parts:
+                    self._json({"error": "Invalid vendor path"}, HTTPStatus.BAD_REQUEST)
+                    return
+                path = (app.vendor_dir / "fontawesome" / name).resolve()
+                root = (app.vendor_dir / "fontawesome").resolve()
+                try:
+                    if root not in path.parents or not path.exists() or not path.is_file():
+                        self._json({"error": "Vendor asset not found"}, HTTPStatus.NOT_FOUND)
+                        return
+                except OSError:
+                    self._json({"error": "Vendor asset not found"}, HTTPStatus.NOT_FOUND)
+                    return
+                content_type = "application/octet-stream"
+                if path.suffix == ".css":
+                    content_type = "text/css; charset=utf-8"
+                elif path.suffix == ".woff2":
+                    content_type = "font/woff2"
+                elif path.suffix == ".ttf":
+                    content_type = "font/ttf"
+                self._serve_file(path, content_type)
 
             def _serve_image(self, encoded_name):
                 name = unquote(encoded_name)

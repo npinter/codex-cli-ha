@@ -21,7 +21,9 @@ openai_organization: ""
 
 ## Image Paste
 
-Paste or drop an image anywhere in the panel, or press `Alt+V` / click `Paste Image`. The add-on reads the browser clipboard, saves the image under `codex_image_dir`, then inserts the saved path into the terminal. This prevents Codex CLI from trying to read a non-existent X11 clipboard inside the container.
+Paste or drop an image anywhere in the panel. The add-on captures browser paste events before xterm, saves the image under `codex_image_dir`, then inserts the saved path into the terminal. This prevents Codex CLI from trying to read a non-existent X11 clipboard inside the container.
+
+`Alt+V` / the paste icon uses the browser Clipboard API when available. If Home Assistant ingress or the browser blocks programmatic clipboard access, the page arms a paste target and asks you to paste with `Ctrl+V` or the browser paste action.
 
 The image panel also has `Run with Image`. This inserts:
 
@@ -55,6 +57,10 @@ Device-code login can still be run inside the terminal if needed. API-key auth c
 - `Reload YAML`: Calls Home Assistant's `homeassistant.reload_all` action through the Supervisor proxy.
 - `Restart HA`: Restarts Home Assistant Core through the Supervisor API.
 - `Rate limit`: Polls Codex app-server's `account/rateLimits/read` method every 60 seconds when credentials are available.
+
+## Codex CLI Version
+
+The Docker build pins Codex CLI to `@openai/codex@0.125.0` instead of `@latest` so Docker layer caching cannot leave an older CLI installed.
 
 ## Persistence
 

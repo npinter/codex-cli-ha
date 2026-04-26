@@ -5,21 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Codex CLI</title>
     <link rel="stylesheet" href="vendor/xterm.css">
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
     <main class="shell">
       <header class="topbar">
         <div>
-          <h1>Codex CLI</h1>
-          <p id="meta">Connecting...</p>
+          <h1 id="title">Codex CLI</h1>
           <p id="rateLimit" class="rate-limit">Rate limit: loading...</p>
         </div>
         <div class="actions">
-          <button id="uploadAuth" type="button">Upload auth.json</button>
-          <button id="pasteImage" type="button">Paste Image</button>
-          <button id="reloadYaml" type="button">Reload YAML</button>
-          <button id="restartHa" type="button">Restart HA</button>
+          <button id="uploadAuth" class="icon-button" type="button" aria-label="Upload auth.json" title="Upload auth.json"><i class="fa-solid fa-key" aria-hidden="true"></i></button>
+          <button id="pasteImage" class="icon-button" type="button" aria-label="Paste image" title="Paste image"><i class="fa-solid fa-paste" aria-hidden="true"></i></button>
+          <button id="reloadYaml" class="icon-button" type="button" aria-label="Reload YAML" title="Reload YAML"><i class="fa-solid fa-rotate" aria-hidden="true"></i></button>
+          <button id="restartHa" class="icon-button danger" type="button" aria-label="Restart Home Assistant" title="Restart Home Assistant"><i class="fa-solid fa-power-off" aria-hidden="true"></i></button>
         </div>
       </header>
 
@@ -64,6 +64,7 @@
       </aside>
 
       <div id="toast" class="toast hidden"></div>
+      <div id="pasteCatcher" class="paste-catcher" contenteditable="true" aria-hidden="true"></div>
     </main>
 
     <script src="vendor/xterm.js"></script>
