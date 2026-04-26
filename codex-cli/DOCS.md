@@ -70,3 +70,7 @@ The Docker build installs Codex CLI with `npm install -g @openai/codex`.
 ## Persistence
 
 The terminal is backed by `tmux` using `codex_session_name`, so switching away from the Home Assistant panel does not kill the Codex session. Add-on restarts still restart the container, but Codex can resume previous sessions.
+
+## Credits
+
+Codex icon source: [Lobe Icons](https://github.com/lobehub/lobe-icons/blob/master/packages/static-png/dark/codex.png).

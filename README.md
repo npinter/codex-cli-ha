@@ -47,3 +47,7 @@ You can also use an API key in the add-on configuration.
 ## Home Assistant Actions
 
 `Reload YAML` calls Home Assistant's `homeassistant.reload_all` action through the Supervisor proxy. `Restart HA` restarts Home Assistant Core through the Supervisor API.
+
+## Credits
+
+Codex icon source: [Lobe Icons](https://github.com/lobehub/lobe-icons/blob/master/packages/static-png/dark/codex.png).
