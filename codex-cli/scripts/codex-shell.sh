@@ -4,7 +4,7 @@ set -uo pipefail
 
 cd "${CODEX_WORKSPACE:-/config}" 2>/dev/null || cd /config || cd /
 
-echo "Codex CLI for Home Assistant"
+echo "Codex CLI (v${CODEX_ADDON_VERSION:-unknown}) for Home Assistant"
 echo
 echo "Image paste: Alt+V -> Ctrl+V -> Insert Path"
 echo "If browser clipboard access is allowed, Alt+V inserts the image path directly."

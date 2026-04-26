@@ -450,7 +450,7 @@ async function refreshRateLimit() {
 fetch(apiUrl("api/state"))
   .then((response) => response.json())
   .then((snapshot) => {
-    el.title.textContent = `Codex CLI (v${snapshot.version || "unknown"})`;
+    el.title.textContent = "Codex CLI";
     el.rateLimit.textContent = snapshot.rateLimitsSummary || "Rate limit: loading...";
     term.options.fontSize = snapshot.fontSize || 14;
     if (snapshot.authPath) {
