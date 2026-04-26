@@ -518,15 +518,22 @@ class App:
         timer.start()
 
     def upload_auth_json(self, payload):
-        raw_b64 = payload.get("data") or ""
-        try:
-            data = base64.b64decode(raw_b64, validate=True)
-        except Exception as exc:
-            raise ValueError("Invalid auth.json upload data") from exc
+        data = payload.get("bytes")
+        if data is None:
+            raw_b64 = str(payload.get("data") or "")
+            if "," in raw_b64 and raw_b64.lstrip().startswith("data:"):
+                raw_b64 = raw_b64.split(",", 1)[1]
+            try:
+                data = base64.b64decode(raw_b64, validate=True)
+            except Exception as exc:
+                raise ValueError("Invalid auth.json upload data") from exc
+        if not isinstance(data, (bytes, bytearray)):
+            raise ValueError("Invalid auth.json upload data")
+        data = bytes(data)
         if len(data) > 1024 * 1024:
             raise ValueError("auth.json is unexpectedly large")
         try:
-            parsed = json.loads(data.decode("utf-8"))
+            parsed = json.loads(data.decode("utf-8-sig"))
         except Exception as exc:
             raise ValueError("Uploaded file is not valid JSON") from exc
         if not isinstance(parsed, dict):
@@ -748,17 +755,19 @@ class App:
                         payload = self._read_upload()
                         self._json({"ok": True, "image": app.upload_image(payload)})
                     else:
-                        payload = self._read_json()
                         if parsed.path == "/api/auth/upload":
+                            payload = self._read_upload()
                             self._json({"ok": True, "result": app.upload_auth_json(payload)})
-                        elif parsed.path == "/api/image/cleanup":
-                            self._json({"ok": True, "result": app.schedule_uploaded_image_cleanup(payload)})
-                        elif parsed.path == "/api/ha/reload-yaml":
-                            self._json({"ok": True, "result": app.home_assistant_action("reload_yaml")})
-                        elif parsed.path == "/api/ha/restart":
-                            self._json({"ok": True, "result": app.home_assistant_action("restart")})
                         else:
-                            self._json({"error": "Not found"}, HTTPStatus.NOT_FOUND)
+                            payload = self._read_json()
+                            if parsed.path == "/api/image/cleanup":
+                                self._json({"ok": True, "result": app.schedule_uploaded_image_cleanup(payload)})
+                            elif parsed.path == "/api/ha/reload-yaml":
+                                self._json({"ok": True, "result": app.home_assistant_action("reload_yaml")})
+                            elif parsed.path == "/api/ha/restart":
+                                self._json({"ok": True, "result": app.home_assistant_action("restart")})
+                            else:
+                                self._json({"error": "Not found"}, HTTPStatus.NOT_FOUND)
                 except Exception as exc:
                     app.add_log(f"request failed: {exc}")
                     self._json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)

@@ -165,15 +165,6 @@ function showToast(message) {
   showToast.timer = window.setTimeout(() => el.toast.classList.add("hidden"), 3500);
 }
 
-async function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result).split(",", 2)[1] || "");
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
-
 function normalizeImageType(type) {
   const mime = String(type || "").split(";", 1)[0].trim().toLowerCase();
   return IMAGE_TYPE_ALIASES.get(mime) || mime;
@@ -428,9 +419,11 @@ el.authUploadForm.addEventListener("submit", async (event) => {
     if (!file) {
       throw new Error("Choose an auth.json file first.");
     }
-    const data = await fileToBase64(file);
     el.authState.textContent = `Uploading ${file.name}...`;
-    const response = await request("api/auth/upload", { name: file.name, data });
+    const formData = new FormData();
+    formData.append("file", file, file.name || "auth.json");
+    formData.append("name", file.name || "auth.json");
+    const response = await requestForm("api/auth/upload", formData);
     const restarted = response.result.terminalRestarted ? " Terminal session restarted." : "";
     el.authState.textContent = `auth.json uploaded to ${response.result.path}.${restarted}`;
     el.authFile.value = "";
