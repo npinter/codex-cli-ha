@@ -67,7 +67,9 @@ Device-code login can still be run inside the terminal if needed. API-key auth c
 
 ## Mobile Controls
 
-The control strip below the header provides runtime terminal text scaling, arrow up/down keys for command history, and terminal scrollback buttons. Text size changes are stored in the browser, so the Home Assistant companion app can use a different size than desktop.
+The control strip below the header provides runtime terminal text scaling, arrow up/down keys for command history, and tmux-backed terminal scrollback buttons. Text size changes are stored in the browser, so the Home Assistant companion app can use a different size than desktop.
+
+The scroll buttons control tmux copy-mode because Codex runs inside a persistent tmux session. Press the bottom scroll button, or start typing, to return to the live prompt after scrolling back.
 
 ## Codex CLI Version
 

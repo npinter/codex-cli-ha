@@ -47,6 +47,7 @@ const state = {
   pasteCaptureTimer: null,
   fontSize: storedFontSize || DEFAULT_FONT_SIZE,
   hasStoredFontSize: storedFontSize !== null,
+  tmuxCopyModeActive: false,
 };
 
 const UPLOAD_IMAGE_TYPES = new Set(["image/gif", "image/jpeg", "image/png", "image/webp"]);
@@ -167,13 +168,27 @@ function sendTerminal(data) {
   term.focus();
 }
 
+function sendTerminalControl(action) {
+  if (!state.socket || state.socket.readyState !== WebSocket.OPEN) return;
+  state.socket.send(JSON.stringify({ type: "control", action }));
+  term.focus();
+}
+
+function sendUserInput(data) {
+  if (state.tmuxCopyModeActive) {
+    state.tmuxCopyModeActive = false;
+    sendTerminalControl("scroll_bottom");
+  }
+  sendTerminal(data);
+}
+
 function resizeTerminal() {
   fit.fit();
   if (!state.socket || state.socket.readyState !== WebSocket.OPEN) return;
   state.socket.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
 }
 
-term.onData((data) => sendTerminal(data));
+term.onData((data) => sendUserInput(data));
 window.addEventListener("resize", resizeTerminal);
 if (window.visualViewport) {
   window.visualViewport.addEventListener("resize", resizeTerminal);
@@ -507,21 +522,27 @@ el.closeAuthPanel.addEventListener("click", () => el.authPanel.classList.add("hi
 el.fontDown.addEventListener("click", () => setTerminalFontSize(state.fontSize - 1, { persist: true }));
 el.fontUp.addEventListener("click", () => setTerminalFontSize(state.fontSize + 1, { persist: true }));
 
-el.keyUp.addEventListener("click", () => sendTerminal("\x1b[A"));
-el.keyDown.addEventListener("click", () => sendTerminal("\x1b[B"));
+el.keyUp.addEventListener("click", () => sendUserInput("\x1b[A"));
+el.keyDown.addEventListener("click", () => sendUserInput("\x1b[B"));
 
 el.scrollUp.addEventListener("click", () => {
   term.scrollPages(-1);
+  state.tmuxCopyModeActive = true;
+  sendTerminalControl("scroll_up");
   term.focus();
 });
 
 el.scrollDown.addEventListener("click", () => {
   term.scrollPages(1);
+  state.tmuxCopyModeActive = true;
+  sendTerminalControl("scroll_down");
   term.focus();
 });
 
 el.scrollBottom.addEventListener("click", () => {
   term.scrollToBottom();
+  state.tmuxCopyModeActive = false;
+  sendTerminalControl("scroll_bottom");
   term.focus();
 });
 

@@ -567,6 +567,30 @@ class App:
             self.add_log(f"failed to restart terminal session: {exc}")
             return False
 
+    def tmux_control(self, action):
+        target = self.session_name
+        if action == "scroll_up":
+            commands = [["tmux", "copy-mode", "-u", "-t", target]]
+        elif action == "scroll_down":
+            commands = [["tmux", "send-keys", "-X", "-t", target, "page-down"]]
+        elif action == "scroll_bottom":
+            commands = [["tmux", "send-keys", "-X", "-t", target, "cancel"]]
+        else:
+            return
+
+        for command in commands:
+            try:
+                subprocess.run(
+                    command,
+                    env=os.environ.copy(),
+                    timeout=5,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                )
+            except Exception as exc:
+                self.add_log(f"tmux control failed for {action}: {exc}")
+
     def read_rate_limits(self):
         try:
             self.codex.start()
@@ -695,6 +719,8 @@ class App:
         message_type = message.get("type")
         if message_type == "input":
             os.write(pty_fd, str(message.get("data", "")).encode("utf-8", errors="replace"))
+        elif message_type == "control":
+            self.tmux_control(str(message.get("action") or ""))
         elif message_type == "resize":
             rows = int(message.get("rows") or 30)
             cols = int(message.get("cols") or 120)
