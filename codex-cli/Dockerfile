@@ -5,6 +5,7 @@ SHELL ["/bin/ash", "-o", "pipefail", "-c"]
 
 RUN apk add --no-cache \
     bash \
+    bubblewrap \
     curl \
     git \
     jq \

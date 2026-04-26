@@ -30,23 +30,36 @@ except ImportError:  # pragma: no cover
 
 
 ALLOWED_IMAGE_TYPES = {
+    "image/avif": ".avif",
+    "image/bmp": ".bmp",
     "image/gif": ".gif",
+    "image/heic": ".heic",
+    "image/heif": ".heif",
     "image/jpeg": ".jpg",
     "image/png": ".png",
+    "image/tiff": ".tiff",
     "image/webp": ".webp",
 }
 
 IMAGE_TYPE_ALIASES = {
     "image/jpg": "image/jpeg",
     "image/pjpeg": "image/jpeg",
+    "image/tif": "image/tiff",
+    "image/x-ms-bmp": "image/bmp",
     "image/x-png": "image/png",
 }
 
 IMAGE_EXTENSION_TYPES = {
+    ".avif": "image/avif",
+    ".bmp": "image/bmp",
     ".gif": "image/gif",
+    ".heic": "image/heic",
+    ".heif": "image/heif",
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
     ".png": "image/png",
+    ".tif": "image/tiff",
+    ".tiff": "image/tiff",
     ".webp": "image/webp",
 }
 
@@ -90,8 +103,18 @@ def detect_image_type(data):
         return "image/jpeg"
     if data.startswith((b"GIF87a", b"GIF89a")):
         return "image/gif"
+    if data.startswith(b"BM"):
+        return "image/bmp"
+    if data.startswith((b"II*\x00", b"MM\x00*")):
+        return "image/tiff"
     if len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
         return "image/webp"
+    if len(data) >= 12 and data[4:8] == b"ftyp":
+        brand = data[8:12]
+        if brand in {b"avif", b"avis"}:
+            return "image/avif"
+        if brand in {b"heic", b"heix", b"hevc", b"hevx", b"mif1", b"msf1"}:
+            return "image/heif"
     return ""
 
 
@@ -394,11 +417,21 @@ class App:
         }
 
     def upload_image(self, payload):
-        raw_b64 = payload.get("data") or ""
-        data = base64.b64decode(raw_b64, validate=True)
+        raw_b64 = str(payload.get("data") or "")
+        if "," in raw_b64 and raw_b64.lstrip().startswith("data:"):
+            raw_b64 = raw_b64.split(",", 1)[1]
+        try:
+            data = base64.b64decode(raw_b64, validate=True)
+        except Exception as exc:
+            raise ValueError("Invalid image upload data") from exc
         mime = infer_image_type(data, payload.get("type"), payload.get("name"))
         if mime not in ALLOWED_IMAGE_TYPES:
-            raise ValueError(f"Unsupported image type: {mime or 'unknown'}")
+            declared = normalize_image_type(payload.get("type"))
+            detected = detect_image_type(data)
+            raise ValueError(
+                f"Unsupported image type: declared={declared or 'none'}, detected={detected or 'none'}, "
+                f"name={payload.get('name') or 'unnamed'}"
+            )
         if len(data) > self.max_upload_bytes:
             raise ValueError(f"Image exceeds {self.max_upload_bytes // 1024 // 1024} MB limit")
         filename = f"{int(time.time())}-{uuid.uuid4().hex[:10]}-{safe_filename(payload.get('name'))}{ALLOWED_IMAGE_TYPES[mime]}"
@@ -721,10 +754,16 @@ class App:
                     self._json({"error": "Image not found"}, HTTPStatus.NOT_FOUND)
                     return
                 content_type = {
+                    ".avif": "image/avif",
+                    ".bmp": "image/bmp",
                     ".gif": "image/gif",
+                    ".heic": "image/heic",
+                    ".heif": "image/heif",
                     ".jpg": "image/jpeg",
                     ".jpeg": "image/jpeg",
                     ".png": "image/png",
+                    ".tif": "image/tiff",
+                    ".tiff": "image/tiff",
                     ".webp": "image/webp",
                 }.get(path.suffix.lower(), "application/octet-stream")
                 self._serve_file(path, content_type)
