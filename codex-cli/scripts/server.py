@@ -610,9 +610,6 @@ class App:
         if not isinstance(rate_limits, dict):
             return "Rate limit: unavailable"
         parts = []
-        name = rate_limits.get("limitName") or rate_limits.get("limitId")
-        if name:
-            parts.append(str(name))
         primary = rate_limits.get("primary") or {}
         secondary = rate_limits.get("secondary") or {}
         if isinstance(primary, dict) and primary.get("usedPercent") is not None:
@@ -622,7 +619,7 @@ class App:
         credits = rate_limits.get("credits") or {}
         if isinstance(credits, dict):
             if credits.get("unlimited"):
-                parts.append("credits unlimited")
+                parts.append("unlimited")
             elif credits.get("balance") is not None:
                 parts.append(f"credits {credits.get('balance')}")
         if rate_limits.get("rateLimitReachedType"):
