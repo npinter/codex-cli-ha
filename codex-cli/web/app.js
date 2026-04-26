@@ -109,6 +109,16 @@ async function request(path, payload) {
   return data;
 }
 
+async function requestForm(path, formData) {
+  const response = await fetch(apiUrl(path), {
+    method: "POST",
+    body: formData,
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || response.statusText);
+  return data;
+}
+
 function connectTerminal() {
   const socket = new WebSocket(wsUrl("ws"));
   state.socket = socket;
@@ -242,12 +252,11 @@ async function normalizeImageForUpload(file) {
 
 async function uploadImage(file) {
   const image = await normalizeImageForUpload(file);
-  const data = await fileToBase64(image.file);
-  const response = await request("api/upload", {
-    name: image.file.name || file.name || "pasted-image",
-    type: image.type,
-    data,
-  });
+  const formData = new FormData();
+  formData.append("file", image.file, image.file.name || file.name || "pasted-image");
+  formData.append("name", image.file.name || file.name || "pasted-image");
+  formData.append("type", image.type);
+  const response = await requestForm("api/upload", formData);
   state.latestImage = response.image;
   renderImagePanel(response.image);
   sendTerminal(`Image pasted: ${response.image.path}`);

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import base64
+import cgi
 import hashlib
 import json
 import os
@@ -417,13 +418,18 @@ class App:
         }
 
     def upload_image(self, payload):
-        raw_b64 = str(payload.get("data") or "")
-        if "," in raw_b64 and raw_b64.lstrip().startswith("data:"):
-            raw_b64 = raw_b64.split(",", 1)[1]
-        try:
-            data = base64.b64decode(raw_b64, validate=True)
-        except Exception as exc:
-            raise ValueError("Invalid image upload data") from exc
+        data = payload.get("bytes")
+        if data is None:
+            raw_b64 = str(payload.get("data") or "")
+            if "," in raw_b64 and raw_b64.lstrip().startswith("data:"):
+                raw_b64 = raw_b64.split(",", 1)[1]
+            try:
+                data = base64.b64decode(raw_b64, validate=True)
+            except Exception as exc:
+                raise ValueError("Invalid image upload data") from exc
+        if not isinstance(data, (bytes, bytearray)):
+            raise ValueError("Invalid image upload data")
+        data = bytes(data)
         mime = infer_image_type(data, payload.get("type"), payload.get("name"))
         if mime not in ALLOWED_IMAGE_TYPES:
             declared = normalize_image_type(payload.get("type"))
@@ -672,20 +678,52 @@ class App:
             def do_POST(self):
                 parsed = urlparse(self.path)
                 try:
-                    payload = self._read_json()
                     if parsed.path == "/api/upload":
+                        payload = self._read_upload()
                         self._json({"ok": True, "image": app.upload_image(payload)})
-                    elif parsed.path == "/api/auth/upload":
-                        self._json({"ok": True, "result": app.upload_auth_json(payload)})
-                    elif parsed.path == "/api/ha/reload-yaml":
-                        self._json({"ok": True, "result": app.home_assistant_action("reload_yaml")})
-                    elif parsed.path == "/api/ha/restart":
-                        self._json({"ok": True, "result": app.home_assistant_action("restart")})
                     else:
-                        self._json({"error": "Not found"}, HTTPStatus.NOT_FOUND)
+                        payload = self._read_json()
+                        if parsed.path == "/api/auth/upload":
+                            self._json({"ok": True, "result": app.upload_auth_json(payload)})
+                        elif parsed.path == "/api/ha/reload-yaml":
+                            self._json({"ok": True, "result": app.home_assistant_action("reload_yaml")})
+                        elif parsed.path == "/api/ha/restart":
+                            self._json({"ok": True, "result": app.home_assistant_action("restart")})
+                        else:
+                            self._json({"error": "Not found"}, HTTPStatus.NOT_FOUND)
                 except Exception as exc:
                     app.add_log(f"request failed: {exc}")
                     self._json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+
+            def _read_upload(self):
+                content_type = self.headers.get("Content-Type", "")
+                if not content_type.lower().startswith("multipart/form-data"):
+                    return self._read_json()
+                length = int(self.headers.get("Content-Length", "0"))
+                if length > app.max_upload_bytes + 1024 * 1024:
+                    raise ValueError("Request body is too large")
+                form = cgi.FieldStorage(
+                    fp=self.rfile,
+                    headers=self.headers,
+                    environ={
+                        "REQUEST_METHOD": "POST",
+                        "CONTENT_TYPE": content_type,
+                        "CONTENT_LENGTH": str(length),
+                    },
+                )
+                item = form["file"] if "file" in form else None
+                if isinstance(item, list):
+                    item = item[0] if item else None
+                if item is None or not getattr(item, "file", None):
+                    raise ValueError("Missing image upload file")
+                data = item.file.read()
+                if len(data) > app.max_upload_bytes:
+                    raise ValueError(f"Image exceeds {app.max_upload_bytes // 1024 // 1024} MB limit")
+                return {
+                    "bytes": data,
+                    "name": item.filename or form.getfirst("name") or "pasted-image",
+                    "type": getattr(item, "type", None) or form.getfirst("type") or "",
+                }
 
             def _read_json(self):
                 length = int(self.headers.get("Content-Length", "0"))

@@ -27,6 +27,8 @@ Paste or drop an image anywhere in the panel. The add-on captures browser paste 
 
 If the browser provides a clipboard image in a format Codex does not normally accept, such as BMP or TIFF, the page converts it to PNG before upload.
 
+Image uploads use multipart file bodies, with the older base64 JSON upload path retained as a fallback.
+
 The container installs `bubblewrap` for Codex sandboxing.
 
 The image panel also has `Run with Image`. This inserts:
