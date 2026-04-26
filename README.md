@@ -4,6 +4,12 @@ Home Assistant add-on repository for running OpenAI Codex CLI from an ingress pa
 
 ## Installation
 
+Click the button below to add this repository to Home Assistant:
+
+[![Open your Home Assistant instance and show the add add-on repository dialog with this repository URL pre-filled.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fnpinter%2Fcodex-cli-ha)
+
+Or add it manually:
+
 1. In Home Assistant, go to Settings -> Add-ons -> Add-on Store.
 2. Open the three-dot menu, then Repositories.
 3. Add this repository URL: `https://github.com/npinter/codex-cli-ha`.
