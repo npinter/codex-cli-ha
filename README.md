@@ -2,6 +2,8 @@
 
 Home Assistant add-on repository for running OpenAI Codex CLI from an ingress panel.
 
+![Codex CLI for Home Assistant screenshot](docs/codex-cli-ha.png)
+
 ## Installation
 
 Click the button below to add this repository to Home Assistant:
