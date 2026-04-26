@@ -2,7 +2,6 @@ ARG BUILD_FROM
 FROM ${BUILD_FROM}
 
 SHELL ["/bin/ash", "-o", "pipefail", "-c"]
-ARG CODEX_CLI_VERSION=0.125.0
 
 RUN apk add --no-cache \
     bash \
@@ -16,7 +15,7 @@ RUN apk add --no-cache \
     tmux \
     vim
 
-RUN npm install -g "@openai/codex@${CODEX_CLI_VERSION}" \
+RUN npm install -g @openai/codex \
     && codex --version \
     && npm install --omit=dev --prefix /tmp/codex-cli-ha-web @xterm/xterm @xterm/addon-fit @fortawesome/fontawesome-free@6.7.2 \
     && mkdir -p /opt/codex-cli-ha/vendor \

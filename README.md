@@ -18,7 +18,7 @@ Home Assistant add-on repository for running OpenAI Codex CLI from an ingress pa
 - The terminal page can insert the saved image path or a generated `codex-image` command.
 - `auth.json` upload helper for copying an existing Codex login into the add-on.
 - Header actions for Codex rate limits, image paste, Home Assistant YAML reload, and Home Assistant restart.
-- Docker build pins Codex CLI to `@openai/codex@0.125.0`.
+- Docker build installs Codex CLI with `npm install -g @openai/codex`.
 
 ## Image Paste
 

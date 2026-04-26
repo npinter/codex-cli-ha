@@ -60,7 +60,7 @@ Device-code login can still be run inside the terminal if needed. API-key auth c
 
 ## Codex CLI Version
 
-The Docker build pins Codex CLI to `@openai/codex@0.125.0` instead of `@latest` so Docker layer caching cannot leave an older CLI installed.
+The Docker build installs Codex CLI with `npm install -g @openai/codex`.
 
 ## Persistence
 
