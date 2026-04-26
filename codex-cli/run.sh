@@ -103,7 +103,7 @@ main() {
     export CODEX_VENDOR_DIR="/opt/codex-cli-ha/vendor"
     export CODEX_SERVER_HOST="0.0.0.0"
     export CODEX_SERVER_PORT="7681"
-    export CODEX_ADDON_VERSION="0.1.15"
+    export CODEX_ADDON_VERSION="0.1.16"
 
     init_environment
     load_openai_settings

@@ -183,6 +183,26 @@ p {
   line-height: 1.35;
 }
 
+.image-summary {
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.image-preview {
+  width: 76px;
+  height: 76px;
+  border: 1px solid var(--ha-divider);
+  border-radius: 4px;
+  object-fit: cover;
+  background: var(--ha-bg);
+}
+
+.image-summary p {
+  overflow-wrap: anywhere;
+}
+
 .panel label {
   display: grid;
   gap: 7px;

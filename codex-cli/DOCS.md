@@ -22,7 +22,7 @@ openai_organization: ""
 
 ## Image Paste
 
-Paste or drop an image anywhere in the panel. The add-on captures browser paste events before xterm, saves the image under `codex_image_dir`, pushes it into an in-container X11 clipboard, then sends Codex the `Alt+V` terminal key sequence. This lets Codex process the image through its normal TUI clipboard path.
+Paste or drop an image anywhere in the panel. The add-on captures browser paste events before xterm, saves the image under `codex_image_dir`, and shows a small preview with an `Insert Path` action.
 
 `Alt+V` / the paste icon uses the browser Clipboard API when available. If Home Assistant ingress or the browser blocks programmatic clipboard access, the page arms a paste target and asks you to paste with `Ctrl+V` or the browser paste action.
 
@@ -30,21 +30,13 @@ If the browser provides a clipboard image in a format Codex does not normally ac
 
 Image uploads use multipart file bodies, with the older base64 JSON upload path retained as a fallback.
 
-Temporary image files are deleted after `codex_image_cleanup_seconds` when the clipboard bridge succeeds.
+Temporary image files are deleted after `codex_image_cleanup_seconds` once `Insert Path` is pressed.
 
 Existing add-on configs that still use the old `/data/codex-images` default are automatically mapped to `/tmp/codex-images-tmp`.
 
-If the clipboard bridge fails, the image panel still shows the temporary path for manual fallback, but the path is not auto-inserted into Codex.
+The image panel only contains `Insert Path` and `Close`; it does not include a prompt box or auto-run action.
 
 The container installs `bubblewrap`, `xvfb`, and `xclip` for Codex sandboxing and the clipboard bridge.
-
-The image panel also has `Run with Image`. This inserts:
-
-```bash
-codex-image /tmp/codex-images-tmp/example.png "your prompt"
-```
-
-`codex-image` resumes the latest Codex session with `--image`. If no previous session exists, it starts a new one.
 
 ## Login
 
@@ -66,7 +58,7 @@ Device-code login can still be run inside the terminal if needed. API-key auth c
 
 ## Header Actions
 
-- `Paste Image`: Reads an image from the browser clipboard and pushes it through Codex's normal image paste path.
+- `Paste Image`: Reads an image from the browser clipboard and opens the image preview panel.
 - `Reload YAML`: Calls Home Assistant's `homeassistant.reload_all` action through the Supervisor proxy.
 - `Restart HA`: Restarts Home Assistant Core through the Supervisor API.
 - `Rate limit`: Polls Codex app-server's `account/rateLimits/read` method every 60 seconds when credentials are available.

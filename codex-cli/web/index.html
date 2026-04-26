@@ -29,17 +29,15 @@
       </section>
 
       <aside id="imagePanel" class="panel hidden">
-        <div>
+        <div class="image-summary">
+          <img id="imagePreview" class="image-preview" alt="Pasted image preview">
+          <div>
           <strong>Pasted image saved</strong>
           <p id="imagePath"></p>
+          </div>
         </div>
-        <label>
-          Prompt for Codex
-          <textarea id="imagePrompt" rows="3" placeholder="Ask Codex about the pasted image..."></textarea>
-        </label>
         <div class="panel-actions">
           <button id="insertPath" type="button">Insert Path</button>
-          <button id="runImage" type="button" class="primary">Run with Image</button>
           <button id="closeImagePanel" type="button">Close</button>
         </div>
       </aside>

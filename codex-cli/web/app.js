@@ -4,10 +4,9 @@ const el = {
   dropZone: document.getElementById("dropZone"),
   dropHint: document.getElementById("dropHint"),
   imagePanel: document.getElementById("imagePanel"),
+  imagePreview: document.getElementById("imagePreview"),
   imagePath: document.getElementById("imagePath"),
-  imagePrompt: document.getElementById("imagePrompt"),
   insertPath: document.getElementById("insertPath"),
-  runImage: document.getElementById("runImage"),
   closeImagePanel: document.getElementById("closeImagePanel"),
   uploadAuth: document.getElementById("uploadAuth"),
   pasteImage: document.getElementById("pasteImage"),
@@ -40,7 +39,6 @@ const IMAGE_TYPE_ALIASES = new Map([
   ["image/x-png", "image/png"],
 ]);
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tif", ".tiff", ".avif", ".heic", ".heif"]);
-const CODEX_ALT_V = "\x1bv";
 
 const baseUrl = new URL(window.location.href);
 if (!baseUrl.pathname.endsWith("/")) baseUrl.pathname = `${baseUrl.pathname}/`;
@@ -160,10 +158,6 @@ function resizeTerminal() {
 term.onData((data) => sendTerminal(data));
 window.addEventListener("resize", resizeTerminal);
 
-function shellQuote(value) {
-  return `'${String(value).replaceAll("'", "'\"'\"'")}'`;
-}
-
 function showToast(message) {
   el.toast.textContent = message;
   el.toast.classList.remove("hidden");
@@ -260,12 +254,7 @@ async function uploadImage(file) {
   const response = await requestForm("api/upload", formData);
   state.latestImage = response.image;
   renderImagePanel(response.image);
-  if (response.image.clipboard?.ok) {
-    sendTerminal(CODEX_ALT_V);
-    showToast("Image pushed to Codex");
-  } else {
-    showToast(response.image.clipboard?.error || `Image saved: ${response.image.name}`);
-  }
+  showToast("Image ready. Press Insert Path to use it.");
 }
 
 function armPasteCapture(message) {
@@ -314,8 +303,9 @@ async function pasteImageFromClipboard(allowPasteFallback = false) {
 
 function renderImagePanel(image) {
   el.imagePanel.classList.remove("hidden");
-  const cleanup = image.cleanupAfterSeconds ? ` Temporary file will be deleted after ${image.cleanupAfterSeconds}s.` : "";
+  const cleanup = image.cleanupAfterSeconds ? ` Deleted ${image.cleanupAfterSeconds}s after Insert Path.` : "";
   el.imagePath.textContent = `${image.path}${cleanup}`;
+  el.imagePreview.src = apiUrl(`api/image/${encodeURIComponent(image.name)}`);
 }
 
 function collectImageFilesFromPaste(event) {
@@ -375,15 +365,9 @@ el.dropZone.addEventListener("drop", (event) => {
 el.insertPath.addEventListener("click", () => {
   if (!state.latestImage) return;
   sendTerminal(state.latestImage.path);
-});
-
-el.runImage.addEventListener("click", () => {
-  if (!state.latestImage) return;
-  const prompt = el.imagePrompt.value.trim();
-  const command = prompt
-    ? `codex-image ${shellQuote(state.latestImage.path)} ${shellQuote(prompt)}\r`
-    : `codex-image ${shellQuote(state.latestImage.path)}\r`;
-  sendTerminal(command);
+  el.imagePanel.classList.add("hidden");
+  showToast("Image path inserted");
+  request("api/image/cleanup", { name: state.latestImage.name }).catch(() => {});
 });
 
 el.closeImagePanel.addEventListener("click", () => el.imagePanel.classList.add("hidden"));

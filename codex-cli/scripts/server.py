@@ -453,8 +453,6 @@ class App:
         except OSError:
             pass
         clipboard = self.push_image_to_clipboard(path, mime)
-        if clipboard.get("ok") and self.image_cleanup_seconds:
-            self.schedule_image_cleanup(path)
         return {
             "name": filename,
             "path": str(path),
@@ -462,9 +460,20 @@ class App:
             "size": len(data),
             "type": mime,
             "temporary": True,
-            "cleanupAfterSeconds": self.image_cleanup_seconds if clipboard.get("ok") else None,
+            "cleanupAfterSeconds": self.image_cleanup_seconds or None,
             "clipboard": clipboard,
         }
+
+    def schedule_uploaded_image_cleanup(self, payload):
+        name = payload.get("name") or ""
+        if "/" in name or "\\" in name:
+            raise ValueError("Invalid image name")
+        path = (self.image_dir / name).resolve()
+        if path.parent != self.image_dir.resolve() or not path.exists():
+            raise ValueError("Image not found")
+        if self.image_cleanup_seconds:
+            self.schedule_image_cleanup(path)
+        return {"name": name, "cleanupAfterSeconds": self.image_cleanup_seconds}
 
     def push_image_to_clipboard(self, path, mime):
         if not self.clipboard_display:
@@ -738,6 +747,8 @@ class App:
                         payload = self._read_json()
                         if parsed.path == "/api/auth/upload":
                             self._json({"ok": True, "result": app.upload_auth_json(payload)})
+                        elif parsed.path == "/api/image/cleanup":
+                            self._json({"ok": True, "result": app.schedule_uploaded_image_cleanup(payload)})
                         elif parsed.path == "/api/ha/reload-yaml":
                             self._json({"ok": True, "result": app.home_assistant_action("reload_yaml")})
                         elif parsed.path == "/api/ha/restart":
