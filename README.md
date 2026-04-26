@@ -13,18 +13,18 @@ Home Assistant add-on repository for running OpenAI Codex CLI from an ingress pa
 
 - Persistent browser terminal backed by `tmux`.
 - Codex CLI installed during the Docker build.
-- Native browser image paste/drop support in the terminal page.
-- Pasted images are saved under `/data/codex-images`.
-- The terminal page can insert the saved image path or a generated `codex-image` command.
+- Native browser image paste/drop support bridged into Codex's in-container clipboard.
+- Pasted images are saved under `/tmp/codex-images-tmp` and cleaned up after handoff.
+- The terminal page can fall back to inserting the saved image path or a generated `codex-image` command.
 - `auth.json` upload helper for copying an existing Codex login into the add-on.
 - Header actions for Codex rate limits, image paste, Home Assistant YAML reload, and Home Assistant restart.
 - Docker build installs Codex CLI with `npm install -g @openai/codex`.
 
 ## Image Paste
 
-Paste or drop an image anywhere on the Codex CLI panel. The add-on captures the browser paste event before xterm, saves the image inside the container, and inserts the saved path into the terminal. `Alt+V` / the paste icon uses the browser Clipboard API when available; if the browser blocks it, the page arms a paste target and asks you to paste with `Ctrl+V` or the browser paste action.
+Paste or drop an image anywhere on the Codex CLI panel. The add-on captures the browser paste event before xterm, saves the image inside the container, pushes it into an in-container X11 clipboard, then sends Codex the `Alt+V` terminal key sequence.
 
-Codex CLI currently attaches images through the CLI `--image` option. A browser terminal cannot change Codex internals while an already-running TUI is waiting for input, so this add-on implements the reliable part natively in the terminal page: clipboard image capture, upload, persistent storage, and terminal command insertion.
+`Alt+V` / the paste icon uses the browser Clipboard API when available; if the browser blocks it, the page arms a paste target and asks you to paste with `Ctrl+V` or the browser paste action.
 
 ## Authentication
 

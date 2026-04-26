@@ -56,24 +56,45 @@ load_openai_settings() {
     fi
 }
 
+start_clipboard_display() {
+    export DISPLAY="${CODEX_CLIPBOARD_DISPLAY:-:99}"
+    export CODEX_CLIPBOARD_DISPLAY="$DISPLAY"
+
+    if command -v Xvfb >/dev/null 2>&1; then
+        Xvfb "$DISPLAY" -screen 0 1024x768x24 -nolisten tcp -ac >/tmp/codex-xvfb.log 2>&1 &
+        sleep 0.2
+        bashio::log.info "Started X11 clipboard display on ${DISPLAY}"
+    else
+        bashio::log.warning "Xvfb is not installed; native Codex image paste bridge is disabled"
+    fi
+}
+
 main() {
+    local image_dir
+    image_dir="$(config_value codex_image_dir /tmp/codex-images-tmp)"
+    if [ "$image_dir" = "/data/codex-images" ]; then
+        image_dir="/tmp/codex-images-tmp"
+    fi
+
     export CODEX_AUTO_LAUNCH="$(config_value auto_launch_codex true)"
     export CODEX_WORKSPACE="$(config_value codex_workspace /config)"
     export CODEX_SESSION_NAME="$(config_value codex_session_name codex-cli)"
     export CODEX_APPROVAL_POLICY="$(config_value codex_approval_policy on-request)"
     export CODEX_SANDBOX="$(config_value codex_sandbox workspace-write)"
     export CODEX_MODEL="$(config_value codex_model '')"
-    export CODEX_IMAGE_DIR="$(config_value codex_image_dir /data/codex-images)"
+    export CODEX_IMAGE_DIR="$image_dir"
     export CODEX_MAX_UPLOAD_MB="$(config_value codex_max_upload_mb 25)"
+    export CODEX_IMAGE_CLEANUP_SECONDS="$(config_value codex_image_cleanup_seconds 60)"
     export CODEX_TERMINAL_FONT_SIZE="$(config_value terminal_font_size 14)"
     export CODEX_WEB_DIR="/opt/codex-cli-ha/web"
     export CODEX_VENDOR_DIR="/opt/codex-cli-ha/vendor"
     export CODEX_SERVER_HOST="0.0.0.0"
     export CODEX_SERVER_PORT="7681"
-    export CODEX_ADDON_VERSION="0.1.13"
+    export CODEX_ADDON_VERSION="0.1.14"
 
     init_environment
     load_openai_settings
+    start_clipboard_display
 
     bashio::log.info "Starting Codex CLI web terminal on ${CODEX_SERVER_HOST}:${CODEX_SERVER_PORT}"
     bashio::log.info "Workspace: ${CODEX_WORKSPACE}"

@@ -40,6 +40,7 @@ const IMAGE_TYPE_ALIASES = new Map([
   ["image/x-png", "image/png"],
 ]);
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tif", ".tiff", ".avif", ".heic", ".heif"]);
+const CODEX_ALT_V = "\x1bv";
 
 const baseUrl = new URL(window.location.href);
 if (!baseUrl.pathname.endsWith("/")) baseUrl.pathname = `${baseUrl.pathname}/`;
@@ -259,8 +260,13 @@ async function uploadImage(file) {
   const response = await requestForm("api/upload", formData);
   state.latestImage = response.image;
   renderImagePanel(response.image);
-  sendTerminal(`Image pasted: ${response.image.path}`);
-  showToast(`Image saved: ${response.image.name}`);
+  if (response.image.clipboard?.ok) {
+    sendTerminal(CODEX_ALT_V);
+    showToast("Image pushed to Codex");
+  } else {
+    sendTerminal(`Image saved: ${response.image.path}`);
+    showToast(response.image.clipboard?.error || `Image saved: ${response.image.name}`);
+  }
 }
 
 function armPasteCapture(message) {
@@ -309,7 +315,8 @@ async function pasteImageFromClipboard(allowPasteFallback = false) {
 
 function renderImagePanel(image) {
   el.imagePanel.classList.remove("hidden");
-  el.imagePath.textContent = image.path;
+  const cleanup = image.cleanupAfterSeconds ? ` Temporary file will be deleted after ${image.cleanupAfterSeconds}s.` : "";
+  el.imagePath.textContent = `${image.path}${cleanup}`;
 }
 
 function collectImageFilesFromPaste(event) {

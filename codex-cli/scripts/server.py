@@ -10,6 +10,7 @@ import queue
 import re
 import select
 import shlex
+import shutil
 import struct
 import subprocess
 import threading
@@ -358,10 +359,12 @@ class App:
         self.workspace = os.environ.get("CODEX_WORKSPACE", "/config")
         self.codex_home = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex")))
         self.session_name = os.environ.get("CODEX_SESSION_NAME", "codex-cli")
-        self.image_dir = Path(os.environ.get("CODEX_IMAGE_DIR", "/data/codex-images"))
+        self.image_dir = Path(os.environ.get("CODEX_IMAGE_DIR", "/tmp/codex-images-tmp"))
         self.web_dir = Path(os.environ.get("CODEX_WEB_DIR", "/opt/codex-cli-ha/web"))
         self.vendor_dir = Path(os.environ.get("CODEX_VENDOR_DIR", "/opt/codex-cli-ha/vendor"))
         self.max_upload_bytes = env_int("CODEX_MAX_UPLOAD_MB", 25) * 1024 * 1024
+        self.image_cleanup_seconds = max(0, env_int("CODEX_IMAGE_CLEANUP_SECONDS", 60))
+        self.clipboard_display = os.environ.get("CODEX_CLIPBOARD_DISPLAY") or os.environ.get("DISPLAY")
         self.font_size = env_int("CODEX_TERMINAL_FONT_SIZE", 14)
         self.version = os.environ.get("CODEX_ADDON_VERSION", "0.1.5")
         self.codex = CodexAppServer(self)
@@ -405,6 +408,8 @@ class App:
             "imageDir": str(self.image_dir),
             "authPath": str(self.codex_home / "auth.json"),
             "maxUploadMb": self.max_upload_bytes // 1024 // 1024,
+            "imageCleanupSeconds": self.image_cleanup_seconds,
+            "clipboardDisplay": self.clipboard_display,
             "fontSize": self.font_size,
             "version": self.version,
             "auth": self.auth_state,
@@ -447,13 +452,59 @@ class App:
             os.chmod(path, 0o600)
         except OSError:
             pass
+        clipboard = self.push_image_to_clipboard(data, mime)
+        if clipboard.get("ok") and self.image_cleanup_seconds:
+            self.schedule_image_cleanup(path)
         return {
             "name": filename,
             "path": str(path),
             "shellPath": shlex.quote(str(path)),
             "size": len(data),
             "type": mime,
+            "temporary": True,
+            "cleanupAfterSeconds": self.image_cleanup_seconds if clipboard.get("ok") else None,
+            "clipboard": clipboard,
         }
+
+    def push_image_to_clipboard(self, data, mime):
+        if not self.clipboard_display:
+            return {"ok": False, "error": "DISPLAY is unavailable"}
+        if not shutil.which("xclip"):
+            return {"ok": False, "error": "xclip is unavailable"}
+
+        env = os.environ.copy()
+        env["DISPLAY"] = self.clipboard_display
+        target = mime if mime in ALLOWED_IMAGE_TYPES else "image/png"
+        try:
+            proc = subprocess.Popen(
+                ["xclip", "-selection", "clipboard", "-target", target, "-loops", "5"],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                env=env,
+            )
+            assert proc.stdin is not None
+            proc.stdin.write(data)
+            proc.stdin.close()
+            time.sleep(0.05)
+            if proc.poll() is not None:
+                return {"ok": False, "error": "xclip exited before owning the clipboard", "target": target}
+            threading.Thread(target=proc.wait, name="xclip-image", daemon=True).start()
+            return {"ok": True, "target": target, "display": self.clipboard_display}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "target": target}
+
+    def schedule_image_cleanup(self, path):
+        def cleanup():
+            try:
+                path.unlink(missing_ok=True)
+                self.add_log(f"deleted temporary image: {path}")
+            except Exception as exc:
+                self.add_log(f"failed to delete temporary image {path}: {exc}")
+
+        timer = threading.Timer(self.image_cleanup_seconds, cleanup)
+        timer.daemon = True
+        timer.start()
 
     def upload_auth_json(self, payload):
         raw_b64 = payload.get("data") or ""

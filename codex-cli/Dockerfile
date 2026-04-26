@@ -14,7 +14,9 @@ RUN apk add --no-cache \
     npm \
     python3 \
     tmux \
-    vim
+    vim \
+    xclip \
+    xvfb
 
 RUN npm install -g @openai/codex \
     && codex --version \
@@ -37,6 +39,7 @@ COPY web/ /opt/codex-cli-ha/web/
 RUN chmod +x /run.sh \
     && chmod +x /opt/codex-cli-ha/scripts/*.sh \
     && chmod +x /opt/codex-cli-ha/scripts/*.py \
+    && if [ -x /usr/bin/bwrap ]; then ln -sf /usr/bin/bwrap /usr/local/bin/bubblewrap; fi \
     && ln -sf /opt/codex-cli-ha/scripts/codex-image.sh /usr/local/bin/codex-image
 
 CMD ["/run.sh"]
