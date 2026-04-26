@@ -36,6 +36,20 @@ ALLOWED_IMAGE_TYPES = {
     "image/webp": ".webp",
 }
 
+IMAGE_TYPE_ALIASES = {
+    "image/jpg": "image/jpeg",
+    "image/pjpeg": "image/jpeg",
+    "image/x-png": "image/png",
+}
+
+IMAGE_EXTENSION_TYPES = {
+    ".gif": "image/gif",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+}
+
 
 def now_ms():
     return int(time.time() * 1000)
@@ -62,6 +76,36 @@ def format_percent(value):
         return f"{float(value):.0f}%"
     except (TypeError, ValueError):
         return str(value)
+
+
+def normalize_image_type(mime):
+    value = (mime or "").split(";", 1)[0].strip().lower()
+    return IMAGE_TYPE_ALIASES.get(value, value)
+
+
+def detect_image_type(data):
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if data.startswith((b"GIF87a", b"GIF89a")):
+        return "image/gif"
+    if len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    return ""
+
+
+def infer_image_type(data, declared_mime, name):
+    detected = detect_image_type(data)
+    if detected:
+        return detected
+    declared = normalize_image_type(declared_mime)
+    if declared in ALLOWED_IMAGE_TYPES:
+        return declared
+    suffix_type = IMAGE_EXTENSION_TYPES.get(Path(name or "").suffix.lower())
+    if suffix_type:
+        return suffix_type
+    return declared
 
 
 def read_exact(sock, length):
@@ -350,11 +394,11 @@ class App:
         }
 
     def upload_image(self, payload):
-        mime = payload.get("type") or ""
-        if mime not in ALLOWED_IMAGE_TYPES:
-            raise ValueError(f"Unsupported image type: {mime}")
         raw_b64 = payload.get("data") or ""
         data = base64.b64decode(raw_b64, validate=True)
+        mime = infer_image_type(data, payload.get("type"), payload.get("name"))
+        if mime not in ALLOWED_IMAGE_TYPES:
+            raise ValueError(f"Unsupported image type: {mime or 'unknown'}")
         if len(data) > self.max_upload_bytes:
             raise ValueError(f"Image exceeds {self.max_upload_bytes // 1024 // 1024} MB limit")
         filename = f"{int(time.time())}-{uuid.uuid4().hex[:10]}-{safe_filename(payload.get('name'))}{ALLOWED_IMAGE_TYPES[mime]}"

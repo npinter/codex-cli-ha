@@ -25,6 +25,8 @@ Paste or drop an image anywhere in the panel. The add-on captures browser paste 
 
 `Alt+V` / the paste icon uses the browser Clipboard API when available. If Home Assistant ingress or the browser blocks programmatic clipboard access, the page arms a paste target and asks you to paste with `Ctrl+V` or the browser paste action.
 
+If the browser provides a clipboard image in a format Codex does not normally accept, such as BMP or TIFF, the page converts it to PNG before upload.
+
 The image panel also has `Run with Image`. This inserts:
 
 ```bash

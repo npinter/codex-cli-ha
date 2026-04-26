@@ -33,6 +33,14 @@ const state = {
   pasteCaptureTimer: null,
 };
 
+const UPLOAD_IMAGE_TYPES = new Set(["image/gif", "image/jpeg", "image/png", "image/webp"]);
+const IMAGE_TYPE_ALIASES = new Map([
+  ["image/jpg", "image/jpeg"],
+  ["image/pjpeg", "image/jpeg"],
+  ["image/x-png", "image/png"],
+]);
+const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tif", ".tiff", ".avif", ".heic", ".heif"]);
+
 const baseUrl = new URL(window.location.href);
 if (!baseUrl.pathname.endsWith("/")) baseUrl.pathname = `${baseUrl.pathname}/`;
 baseUrl.search = "";
@@ -161,11 +169,83 @@ async function fileToBase64(file) {
   });
 }
 
+function normalizeImageType(type) {
+  const mime = String(type || "").split(";", 1)[0].trim().toLowerCase();
+  return IMAGE_TYPE_ALIASES.get(mime) || mime;
+}
+
+function fileExtension(name) {
+  const match = String(name || "").toLowerCase().match(/\.[a-z0-9]+$/);
+  return match ? match[0] : "";
+}
+
+function fileStem(name) {
+  return String(name || "clipboard-image").replace(/\.[^.]*$/, "") || "clipboard-image";
+}
+
+function isLikelyImageFile(file) {
+  const mime = normalizeImageType(file?.type);
+  return mime.startsWith("image/") || IMAGE_EXTENSIONS.has(fileExtension(file?.name));
+}
+
+async function canvasToPngFile(canvas, name) {
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!blob) throw new Error("Browser could not convert pasted image to PNG");
+  return new File([blob], `${fileStem(name)}.png`, { type: "image/png" });
+}
+
+async function convertImageToPng(file) {
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Browser canvas support is unavailable");
+
+  if ("createImageBitmap" in window) {
+    try {
+      const bitmap = await createImageBitmap(file);
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      context.drawImage(bitmap, 0, 0);
+      bitmap.close?.();
+      return canvasToPngFile(canvas, file.name);
+    } catch {
+      // Fall through to object URL decoding below.
+    }
+  }
+
+  const url = URL.createObjectURL(file);
+  try {
+    const image = await new Promise((resolve, reject) => {
+      const element = new Image();
+      element.onload = () => resolve(element);
+      element.onerror = () => reject(new Error(`Unsupported pasted image type: ${file.type || "unknown"}`));
+      element.src = url;
+    });
+    canvas.width = image.naturalWidth || image.width;
+    canvas.height = image.naturalHeight || image.height;
+    context.drawImage(image, 0, 0);
+    return canvasToPngFile(canvas, file.name);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+async function normalizeImageForUpload(file) {
+  const mime = normalizeImageType(file.type);
+  if (UPLOAD_IMAGE_TYPES.has(mime)) {
+    if (mime === file.type) return { file, type: mime };
+    const name = file.name || `clipboard-${Date.now()}`;
+    return { file: new File([file], name, { type: mime }), type: mime };
+  }
+  const converted = await convertImageToPng(file);
+  return { file: converted, type: "image/png" };
+}
+
 async function uploadImage(file) {
-  const data = await fileToBase64(file);
+  const image = await normalizeImageForUpload(file);
+  const data = await fileToBase64(image.file);
   const response = await request("api/upload", {
-    name: file.name || "pasted-image",
-    type: file.type,
+    name: image.file.name || file.name || "pasted-image",
+    type: image.type,
     data,
   });
   state.latestImage = response.image;
@@ -226,13 +306,13 @@ function renderImagePanel(image) {
 function collectImageFilesFromPaste(event) {
   const files = [];
   for (const item of Array.from(event.clipboardData?.items || [])) {
-    if (item.kind === "file" && item.type.startsWith("image/")) {
+    if (item.kind === "file" && normalizeImageType(item.type).startsWith("image/")) {
       const file = item.getAsFile();
-      if (file) files.push(file);
+      if (file && isLikelyImageFile(file)) files.push(file);
     }
   }
   for (const file of Array.from(event.clipboardData?.files || [])) {
-    if (file.type.startsWith("image/") && !files.includes(file)) {
+    if (isLikelyImageFile(file) && !files.includes(file)) {
       files.push(file);
     }
   }
@@ -240,7 +320,7 @@ function collectImageFilesFromPaste(event) {
 }
 
 async function handleFiles(files) {
-  const images = Array.from(files || []).filter((file) => file.type.startsWith("image/"));
+  const images = Array.from(files || []).filter(isLikelyImageFile);
   if (!images.length) return;
   for (const image of images) {
     await uploadImage(image);
