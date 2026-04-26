@@ -718,6 +718,10 @@ class App:
                     self._serve_file(app.web_dir / "app.js", "application/javascript; charset=utf-8")
                 elif path == "/styles.css":
                     self._serve_file(app.web_dir / "styles.css", "text/css; charset=utf-8")
+                elif path == "/icon.png":
+                    self._serve_file(app.web_dir / "icon.png", "image/png")
+                elif path == "/favicon.ico":
+                    self._serve_file(app.web_dir / "favicon.ico", "image/x-icon")
                 elif path == "/vendor/xterm.css":
                     self._serve_file(app.vendor_dir / "xterm.css", "text/css; charset=utf-8")
                 elif path == "/vendor/xterm.js":
