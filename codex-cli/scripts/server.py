@@ -613,9 +613,10 @@ class App:
         primary = rate_limits.get("primary") or {}
         secondary = rate_limits.get("secondary") or {}
         if isinstance(primary, dict) and primary.get("usedPercent") is not None:
-            parts.append(f"{format_percent(primary.get('usedPercent'))} primary")
-        if isinstance(secondary, dict) and secondary.get("usedPercent") is not None:
-            parts.append(f"{format_percent(secondary.get('usedPercent'))} secondary")
+            primary_percent = format_percent(primary.get("usedPercent"))
+            if isinstance(secondary, dict) and secondary.get("usedPercent") is not None:
+                return f"Rate limit: {primary_percent}/{format_percent(secondary.get('usedPercent'))}"
+            return f"Rate limit: {primary_percent}"
         credits = rate_limits.get("credits") or {}
         if isinstance(credits, dict):
             if credits.get("unlimited"):
