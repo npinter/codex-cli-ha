@@ -10,8 +10,10 @@ const el = {
   runImage: document.getElementById("runImage"),
   closeImagePanel: document.getElementById("closeImagePanel"),
   uploadAuth: document.getElementById("uploadAuth"),
-  loginDevice: document.getElementById("loginDevice"),
-  loginStatus: document.getElementById("loginStatus"),
+  pasteImage: document.getElementById("pasteImage"),
+  reloadYaml: document.getElementById("reloadYaml"),
+  restartHa: document.getElementById("restartHa"),
+  rateLimit: document.getElementById("rateLimit"),
   authPanel: document.getElementById("authPanel"),
   authUploadForm: document.getElementById("authUploadForm"),
   authState: document.getElementById("authState"),
@@ -66,6 +68,14 @@ const fit = new FitAddon.FitAddon();
 term.loadAddon(fit);
 term.open(el.terminal);
 fit.fit();
+term.attachCustomKeyEventHandler((event) => {
+  if (event.type === "keydown" && event.altKey && event.key.toLowerCase() === "v") {
+    event.preventDefault();
+    pasteImageFromClipboard();
+    return false;
+  }
+  return true;
+});
 
 function wsUrl(path) {
   const url = new URL(path, baseUrl);
@@ -157,8 +167,32 @@ async function uploadImage(file) {
   });
   state.latestImage = response.image;
   renderImagePanel(response.image);
-  sendTerminal(response.image.path);
+  sendTerminal(`Image pasted: ${response.image.path}`);
   showToast(`Image saved: ${response.image.name}`);
+}
+
+async function pasteImageFromClipboard() {
+  if (!navigator.clipboard?.read) {
+    showToast("Browser clipboard image access is unavailable. Use normal paste or drop.");
+    return;
+  }
+  try {
+    const items = await navigator.clipboard.read();
+    const files = [];
+    for (const item of items) {
+      const imageType = item.types.find((type) => type.startsWith("image/"));
+      if (!imageType) continue;
+      const blob = await item.getType(imageType);
+      files.push(new File([blob], `clipboard-${Date.now()}.${imageType.split("/")[1] || "png"}`, { type: imageType }));
+    }
+    if (!files.length) {
+      showToast("Clipboard does not contain an image");
+      return;
+    }
+    await handleFiles(files);
+  } catch (error) {
+    showToast(`Browser clipboard read failed: ${error.message}`);
+  }
 }
 
 function renderImagePanel(image) {
@@ -221,22 +255,9 @@ el.runImage.addEventListener("click", () => {
 
 el.closeImagePanel.addEventListener("click", () => el.imagePanel.classList.add("hidden"));
 
-async function startAuth(type) {
-  el.authPanel.classList.remove("hidden");
-  el.authState.textContent = "Starting login...";
-  try {
-    const response = await request("api/auth/start", { type });
-    renderAuth(response.result);
-  } catch (error) {
-    el.authState.textContent = error.message;
-  }
-}
-
 function renderAuth(auth) {
   if (auth?.type === "authJson") {
     el.authState.textContent = `auth.json uploaded to ${auth.path}`;
-  } else if (auth?.verificationUrl) {
-    el.authState.innerHTML = `<a href="${auth.verificationUrl}" target="_blank" rel="noreferrer">Open device login</a><br>Code: <strong>${auth.userCode || ""}</strong>`;
   } else {
     el.authState.textContent = JSON.stringify(auth || {});
   }
@@ -247,12 +268,30 @@ el.uploadAuth.addEventListener("click", () => {
   el.authState.textContent = "Choose auth.json and upload it.";
 });
 
-el.loginDevice.addEventListener("click", () => startAuth("chatgptDeviceCode"));
+el.pasteImage.addEventListener("click", () => pasteImageFromClipboard());
 
-el.loginStatus.addEventListener("click", async () => {
-  el.authPanel.classList.remove("hidden");
-  const response = await fetch(apiUrl("api/auth/status")).then((item) => item.json());
-  el.authState.textContent = `${response.status.stdout || ""}${response.status.stderr || ""}`.trim() || `exit ${response.status.code}`;
+el.reloadYaml.addEventListener("click", async () => {
+  el.reloadYaml.disabled = true;
+  try {
+    await request("api/ha/reload-yaml", {});
+    showToast("Home Assistant YAML reload requested");
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    el.reloadYaml.disabled = false;
+  }
+});
+
+el.restartHa.addEventListener("click", async () => {
+  if (!window.confirm("Restart Home Assistant Core now?")) return;
+  el.restartHa.disabled = true;
+  try {
+    await request("api/ha/restart", {});
+    showToast("Home Assistant restart requested");
+  } catch (error) {
+    showToast(error.message);
+    el.restartHa.disabled = false;
+  }
 });
 
 el.authUploadForm.addEventListener("submit", async (event) => {
@@ -267,8 +306,10 @@ el.authUploadForm.addEventListener("submit", async (event) => {
     const data = await fileToBase64(file);
     el.authState.textContent = `Uploading ${file.name}...`;
     const response = await request("api/auth/upload", { name: file.name, data });
-    el.authState.textContent = `auth.json uploaded to ${response.result.path}. Restart Codex in the terminal or click Login Status.`;
+    const restarted = response.result.terminalRestarted ? " Terminal session restarted." : "";
+    el.authState.textContent = `auth.json uploaded to ${response.result.path}.${restarted}`;
     el.authFile.value = "";
+    refreshRateLimit();
   } catch (error) {
     el.authState.textContent = error.message;
   } finally {
@@ -278,10 +319,21 @@ el.authUploadForm.addEventListener("submit", async (event) => {
 
 el.closeAuthPanel.addEventListener("click", () => el.authPanel.classList.add("hidden"));
 
+async function refreshRateLimit() {
+  try {
+    const response = await fetch(apiUrl("api/rate-limits")).then((item) => item.json());
+    if (!response.ok) throw new Error(response.error || "Rate limit unavailable");
+    el.rateLimit.textContent = response.result.summary || "Rate limit: unavailable";
+  } catch (error) {
+    el.rateLimit.textContent = "Rate limit: unavailable";
+  }
+}
+
 fetch(apiUrl("api/state"))
   .then((response) => response.json())
   .then((snapshot) => {
     el.meta.textContent = `Version: ${snapshot.version || "unknown"} | Workspace: ${snapshot.workspace} | Images: ${snapshot.imageDir}`;
+    el.rateLimit.textContent = snapshot.rateLimitsSummary || "Rate limit: loading...";
     term.options.fontSize = snapshot.fontSize || 14;
     if (snapshot.authPath) {
       el.authPath.textContent = `Target path: ${snapshot.authPath}`;
@@ -297,4 +349,6 @@ fetch(apiUrl("api/state"))
   });
 
 connectTerminal();
+refreshRateLimit();
+window.setInterval(refreshRateLimit, 60000);
 term.focus();

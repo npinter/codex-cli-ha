@@ -89,6 +89,10 @@ p {
   font-size: 13px;
 }
 
+.topbar .rate-limit {
+  color: var(--ha-primary);
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;

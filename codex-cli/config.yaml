@@ -1,7 +1,7 @@
 ---
 name: "Codex CLI"
 description: "Codex CLI terminal for Home Assistant with native image paste support"
-version: "0.1.7"
+version: "0.1.8"
 slug: "codex_cli"
 init: false
 
@@ -54,6 +54,10 @@ schema:
 map:
   - config:rw
   - share:rw
+
+hassio_api: true
+hassio_role: manager
+homeassistant_api: true
 
 startup: services
 

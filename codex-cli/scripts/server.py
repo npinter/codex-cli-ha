@@ -9,16 +9,17 @@ import queue
 import re
 import select
 import shlex
-import socket
 import struct
 import subprocess
 import threading
 import time
 import uuid
+from urllib.error import HTTPError, URLError
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import quote, unquote, urlparse
+from urllib.parse import unquote, urlparse
+from urllib.request import Request, urlopen
 
 try:
     import fcntl
@@ -54,6 +55,13 @@ def safe_filename(name):
     stem = Path(name or "image").stem
     stem = re.sub(r"[^A-Za-z0-9_.-]+", "-", stem).strip(".-")
     return stem[:80] or "image"
+
+
+def format_percent(value):
+    try:
+        return f"{float(value):.0f}%"
+    except (TypeError, ValueError):
+        return str(value)
 
 
 def read_exact(sock, length):
@@ -141,7 +149,7 @@ class CodexProtocolError(RuntimeError):
     pass
 
 
-class CodexAuthServer:
+class CodexAppServer:
     def __init__(self, app):
         self.app = app
         self.proc = None
@@ -165,18 +173,28 @@ class CodexAuthServer:
             bufsize=1,
             env=os.environ.copy(),
         )
-        threading.Thread(target=self._read_stdout, name="codex-auth-stdout", daemon=True).start()
-        threading.Thread(target=self._read_stderr, name="codex-auth-stderr", daemon=True).start()
+        threading.Thread(target=self._read_stdout, name="codex-app-stdout", daemon=True).start()
+        threading.Thread(target=self._read_stderr, name="codex-app-stderr", daemon=True).start()
 
         self.request(
             "initialize",
             {
-                "clientInfo": {"name": "codex-cli-ha", "title": "Codex CLI HA", "version": "0.1.0"},
+                "clientInfo": {"name": "codex-cli-ha", "title": "Codex CLI HA", "version": self.app.version},
                 "capabilities": {"experimentalApi": True},
             },
             timeout=30,
         )
         self.notify({"method": "initialized"})
+
+    def stop(self):
+        if self.proc is None:
+            return
+        self.proc.terminate()
+        try:
+            self.proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            self.proc.kill()
+        self.proc = None
 
     def request(self, method, params=None, timeout=120):
         request_id = self._allocate_id()
@@ -209,7 +227,7 @@ class CodexAuthServer:
 
     def _send(self, payload):
         if self.proc is None or self.proc.stdin is None:
-            raise CodexProtocolError("Codex auth server is not running")
+            raise CodexProtocolError("Codex app-server is not running")
         with self.write_lock:
             self.proc.stdin.write(json.dumps(payload, separators=(",", ":")) + "\n")
             self.proc.stdin.flush()
@@ -226,7 +244,7 @@ class CodexAuthServer:
                 self.app.add_log(f"codex: {line}")
                 continue
             self._dispatch(message)
-        self.app.add_log("Codex auth app-server stopped")
+        self.app.add_log("Codex app-server stopped")
 
     def _read_stderr(self):
         assert self.proc is not None and self.proc.stderr is not None
@@ -259,6 +277,8 @@ class CodexAuthServer:
             )
         elif method == "account/updated":
             self.app.add_log(f"account updated: {json.dumps(params)}")
+        elif method == "account/rateLimits/updated":
+            self.app.set_rate_limits(params.get("rateLimits"))
         elif method:
             self.app.add_log(f"{method}: {json.dumps(params)[:500]}")
 
@@ -276,9 +296,13 @@ class App:
         self.max_upload_bytes = env_int("CODEX_MAX_UPLOAD_MB", 25) * 1024 * 1024
         self.font_size = env_int("CODEX_TERMINAL_FONT_SIZE", 14)
         self.version = os.environ.get("CODEX_ADDON_VERSION", "0.1.5")
-        self.auth = CodexAuthServer(self)
+        self.codex = CodexAppServer(self)
         self.logs = queue.Queue(maxsize=200)
         self.auth_state = None
+        self.rate_limits = None
+        self.rate_limits_updated_at = None
+        self.rate_limits_error = None
+        self.ha_action = None
         self.image_dir.mkdir(parents=True, exist_ok=True)
 
     def serve(self):
@@ -301,6 +325,11 @@ class App:
     def set_auth_state(self, state):
         self.auth_state = state
 
+    def set_rate_limits(self, rate_limits):
+        self.rate_limits = rate_limits
+        self.rate_limits_updated_at = now_ms()
+        self.rate_limits_error = None
+
     def snapshot(self):
         return {
             "workspace": self.workspace,
@@ -311,6 +340,12 @@ class App:
             "fontSize": self.font_size,
             "version": self.version,
             "auth": self.auth_state,
+            "authExists": (self.codex_home / "auth.json").exists(),
+            "rateLimits": self.rate_limits,
+            "rateLimitsSummary": self._rate_limits_summary(self.rate_limits),
+            "rateLimitsUpdatedAt": self.rate_limits_updated_at,
+            "rateLimitsError": self.rate_limits_error,
+            "haAction": self.ha_action,
             "logs": list(self.logs.queue),
         }
 
@@ -337,27 +372,6 @@ class App:
             "type": mime,
         }
 
-    def start_login(self, payload):
-        login_type = payload.get("type") or "chatgpt"
-        if login_type == "apiKey":
-            api_key = payload.get("apiKey") or os.environ.get("OPENAI_API_KEY")
-            if not api_key:
-                raise ValueError("API key is required")
-            params = {"type": "apiKey", "apiKey": api_key}
-        elif login_type == "chatgptDeviceCode":
-            params = {"type": "chatgptDeviceCode"}
-        else:
-            params = {"type": "chatgpt"}
-
-        self.auth.start()
-        result = self.auth.request("account/login/start", params, timeout=60)
-        state = dict(result)
-        state["startedAt"] = now_ms()
-        if login_type == "apiKey":
-            state["apiKey"] = None
-        self.set_auth_state(state)
-        return result
-
     def upload_auth_json(self, payload):
         raw_b64 = payload.get("data") or ""
         try:
@@ -383,23 +397,91 @@ class App:
         tmp_path.write_bytes(json.dumps(parsed, indent=2).encode("utf-8"))
         os.chmod(tmp_path, 0o600)
         tmp_path.replace(auth_path)
-        self.set_auth_state({"type": "authJson", "path": str(auth_path), "uploadedAt": now_ms()})
-        return {"path": str(auth_path)}
+        self.codex.stop()
+        restarted = self.restart_terminal_session()
+        self.set_auth_state({"type": "authJson", "path": str(auth_path), "uploadedAt": now_ms(), "restarted": restarted})
+        return {"path": str(auth_path), "bytes": len(data), "keys": sorted(parsed.keys()), "terminalRestarted": restarted}
 
-    def login_status(self):
+    def restart_terminal_session(self):
         try:
-            result = subprocess.run(
-                ["codex", "login", "status"],
-                cwd=self.workspace,
+            subprocess.run(
+                ["tmux", "kill-session", "-t", self.session_name],
                 env=os.environ.copy(),
-                text=True,
-                capture_output=True,
-                timeout=20,
+                timeout=10,
                 check=False,
             )
-            return {"code": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
+            return True
         except Exception as exc:
-            return {"code": 1, "stdout": "", "stderr": str(exc)}
+            self.add_log(f"failed to restart terminal session: {exc}")
+            return False
+
+    def read_rate_limits(self):
+        try:
+            self.codex.start()
+            result = self.codex.request("account/rateLimits/read", timeout=30) or {}
+            rate_limits = result.get("rateLimits") if isinstance(result, dict) else result
+            self.set_rate_limits(rate_limits)
+            return {
+                "rateLimits": self.rate_limits,
+                "summary": self._rate_limits_summary(self.rate_limits),
+                "updatedAt": self.rate_limits_updated_at,
+            }
+        except Exception as exc:
+            self.rate_limits_error = str(exc)
+            return {"rateLimits": None, "summary": "Rate limit: unavailable", "error": str(exc), "updatedAt": now_ms()}
+
+    def _rate_limits_summary(self, rate_limits):
+        if not isinstance(rate_limits, dict):
+            return "Rate limit: unavailable"
+        parts = []
+        name = rate_limits.get("limitName") or rate_limits.get("limitId")
+        if name:
+            parts.append(str(name))
+        primary = rate_limits.get("primary") or {}
+        secondary = rate_limits.get("secondary") or {}
+        if isinstance(primary, dict) and primary.get("usedPercent") is not None:
+            parts.append(f"{format_percent(primary.get('usedPercent'))} primary")
+        if isinstance(secondary, dict) and secondary.get("usedPercent") is not None:
+            parts.append(f"{format_percent(secondary.get('usedPercent'))} secondary")
+        credits = rate_limits.get("credits") or {}
+        if isinstance(credits, dict):
+            if credits.get("unlimited"):
+                parts.append("credits unlimited")
+            elif credits.get("balance") is not None:
+                parts.append(f"credits {credits.get('balance')}")
+        if rate_limits.get("rateLimitReachedType"):
+            parts.append(str(rate_limits.get("rateLimitReachedType")))
+        return "Rate limit: " + (" | ".join(parts) if parts else "available")
+
+    def home_assistant_action(self, action):
+        token = os.environ.get("SUPERVISOR_TOKEN")
+        if not token:
+            raise ValueError("SUPERVISOR_TOKEN is unavailable; rebuild the add-on with Home Assistant API access enabled")
+        if action == "reload_yaml":
+            url = "http://supervisor/core/api/services/homeassistant/reload_all"
+            body = b"{}"
+        elif action == "restart":
+            url = "http://supervisor/core/restart"
+            body = b"{}"
+        else:
+            raise ValueError("Unknown Home Assistant action")
+        request = Request(
+            url,
+            data=body,
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urlopen(request, timeout=20) as response:
+                response_body = response.read(2048).decode("utf-8", errors="replace")
+                result = {"status": response.status, "body": response_body}
+        except HTTPError as exc:
+            response_body = exc.read(2048).decode("utf-8", errors="replace")
+            raise ValueError(f"Home Assistant API returned HTTP {exc.code}: {response_body}") from exc
+        except URLError as exc:
+            raise ValueError(f"Home Assistant API request failed: {exc}") from exc
+        self.ha_action = {"action": action, "time": now_ms(), "result": result}
+        return result
 
     def handle_terminal_ws(self, handler):
         ws = WebSocket(handler)
@@ -499,8 +581,8 @@ class App:
                     self._serve_file(app.vendor_dir / "xterm-addon-fit.js", "application/javascript; charset=utf-8")
                 elif path == "/api/state":
                     self._json(app.snapshot())
-                elif path == "/api/auth/status":
-                    self._json({"ok": True, "status": app.login_status()})
+                elif path == "/api/rate-limits":
+                    self._json({"ok": True, "result": app.read_rate_limits()})
                 elif path.startswith("/api/image/"):
                     self._serve_image(path.removeprefix("/api/image/"))
                 elif path == "/ws":
@@ -514,10 +596,12 @@ class App:
                     payload = self._read_json()
                     if parsed.path == "/api/upload":
                         self._json({"ok": True, "image": app.upload_image(payload)})
-                    elif parsed.path == "/api/auth/start":
-                        self._json({"ok": True, "result": app.start_login(payload)})
                     elif parsed.path == "/api/auth/upload":
                         self._json({"ok": True, "result": app.upload_auth_json(payload)})
+                    elif parsed.path == "/api/ha/reload-yaml":
+                        self._json({"ok": True, "result": app.home_assistant_action("reload_yaml")})
+                    elif parsed.path == "/api/ha/restart":
+                        self._json({"ok": True, "result": app.home_assistant_action("restart")})
                     else:
                         self._json({"error": "Not found"}, HTTPStatus.NOT_FOUND)
                 except Exception as exc:

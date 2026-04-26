@@ -17,10 +17,11 @@ Home Assistant add-on repository for running OpenAI Codex CLI from an ingress pa
 - Pasted images are saved under `/data/codex-images`.
 - The terminal page can insert the saved image path or a generated `codex-image` command.
 - `auth.json` upload helper for copying an existing Codex login into the add-on.
+- Header actions for Codex rate limits, browser clipboard image paste, Home Assistant YAML reload, and Home Assistant restart.
 
 ## Image Paste
 
-Paste or drop an image anywhere on the Codex CLI panel. The add-on saves it inside the container and shows the saved path. You can insert the path into the terminal, or use the `Run with image` prompt to start/resume Codex with that image attached.
+Paste or drop an image anywhere on the Codex CLI panel, or press `Alt+V` / click `Paste Image`. The add-on reads the browser clipboard, saves the image inside the container, and inserts the saved path into the terminal. You can also use the `Run with image` prompt to start/resume Codex with that image attached.
 
 Codex CLI currently attaches images through the CLI `--image` option. A browser terminal cannot change Codex internals while an already-running TUI is waiting for input, so this add-on implements the reliable part natively in the terminal page: clipboard image capture, upload, persistent storage, and terminal command insertion.
 
@@ -38,4 +39,10 @@ The add-on stores the uploaded file at:
 /data/home/.codex/auth.json
 ```
 
+Uploading `auth.json` restarts the persistent terminal session so Codex picks up the new credentials.
+
 You can also use an API key in the add-on configuration.
+
+## Home Assistant Actions
+
+`Reload YAML` calls Home Assistant's `homeassistant.reload_all` action through the Supervisor proxy. `Restart HA` restarts Home Assistant Core through the Supervisor API.

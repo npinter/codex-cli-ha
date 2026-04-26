@@ -21,7 +21,7 @@ openai_organization: ""
 
 ## Image Paste
 
-Paste or drop an image anywhere in the panel. The add-on saves it under `codex_image_dir`, then inserts the saved path into the terminal.
+Paste or drop an image anywhere in the panel, or press `Alt+V` / click `Paste Image`. The add-on reads the browser clipboard, saves the image under `codex_image_dir`, then inserts the saved path into the terminal. This prevents Codex CLI from trying to read a non-existent X11 clipboard inside the container.
 
 The image panel also has `Run with Image`. This inserts:
 
@@ -45,9 +45,16 @@ The add-on stores the uploaded file at:
 /data/home/.codex/auth.json
 ```
 
-After uploading, restart Codex in the terminal if it was already running.
+After uploading, the add-on restarts the persistent terminal session so Codex picks up the new credentials.
 
-Device-code login is also available. API-key auth can be configured with `openai_api_key`.
+Device-code login can still be run inside the terminal if needed. API-key auth can be configured with `openai_api_key`.
+
+## Header Actions
+
+- `Paste Image`: Reads an image from the browser clipboard and inserts the saved path into the terminal.
+- `Reload YAML`: Calls Home Assistant's `homeassistant.reload_all` action through the Supervisor proxy.
+- `Restart HA`: Restarts Home Assistant Core through the Supervisor API.
+- `Rate limit`: Polls Codex app-server's `account/rateLimits/read` method every 60 seconds when credentials are available.
 
 ## Persistence
 
