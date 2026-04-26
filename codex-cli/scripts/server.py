@@ -452,7 +452,7 @@ class App:
             os.chmod(path, 0o600)
         except OSError:
             pass
-        clipboard = self.push_image_to_clipboard(data, mime)
+        clipboard = self.push_image_to_clipboard(path, mime)
         if clipboard.get("ok") and self.image_cleanup_seconds:
             self.schedule_image_cleanup(path)
         return {
@@ -466,29 +466,31 @@ class App:
             "clipboard": clipboard,
         }
 
-    def push_image_to_clipboard(self, data, mime):
+    def push_image_to_clipboard(self, path, mime):
         if not self.clipboard_display:
             return {"ok": False, "error": "DISPLAY is unavailable"}
         if not shutil.which("xclip"):
             return {"ok": False, "error": "xclip is unavailable"}
+        if not path.exists():
+            return {"ok": False, "error": f"image file is unavailable: {path}"}
 
         env = os.environ.copy()
         env["DISPLAY"] = self.clipboard_display
         target = mime if mime in ALLOWED_IMAGE_TYPES else "image/png"
         try:
             proc = subprocess.Popen(
-                ["xclip", "-selection", "clipboard", "-target", target, "-loops", "5"],
-                stdin=subprocess.PIPE,
+                ["xclip", "-selection", "clipboard", "-target", target, "-i", str(path)],
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
                 env=env,
             )
-            assert proc.stdin is not None
-            proc.stdin.write(data)
-            proc.stdin.close()
-            time.sleep(0.05)
+            time.sleep(0.3)
             if proc.poll() is not None:
-                return {"ok": False, "error": "xclip exited before owning the clipboard", "target": target}
+                stderr = ""
+                if proc.stderr is not None:
+                    stderr = proc.stderr.read(2048).decode("utf-8", errors="replace").strip()
+                error = stderr or f"xclip exited before owning the clipboard (exit {proc.returncode})"
+                return {"ok": False, "error": error, "target": target, "display": self.clipboard_display}
             threading.Thread(target=proc.wait, name="xclip-image", daemon=True).start()
             return {"ok": True, "target": target, "display": self.clipboard_display}
         except Exception as exc:

@@ -264,7 +264,6 @@ async function uploadImage(file) {
     sendTerminal(CODEX_ALT_V);
     showToast("Image pushed to Codex");
   } else {
-    sendTerminal(`Image saved: ${response.image.path}`);
     showToast(response.image.clipboard?.error || `Image saved: ${response.image.name}`);
   }
 }

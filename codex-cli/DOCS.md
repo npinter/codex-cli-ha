@@ -34,6 +34,8 @@ Temporary image files are deleted after `codex_image_cleanup_seconds` when the c
 
 Existing add-on configs that still use the old `/data/codex-images` default are automatically mapped to `/tmp/codex-images-tmp`.
 
+If the clipboard bridge fails, the image panel still shows the temporary path for manual fallback, but the path is not auto-inserted into Codex.
+
 The container installs `bubblewrap`, `xvfb`, and `xclip` for Codex sandboxing and the clipboard bridge.
 
 The image panel also has `Run with Image`. This inserts:

@@ -61,9 +61,22 @@ start_clipboard_display() {
     export CODEX_CLIPBOARD_DISPLAY="$DISPLAY"
 
     if command -v Xvfb >/dev/null 2>&1; then
+        local display_number
+        display_number="${DISPLAY#:}"
+        display_number="${display_number%%.*}"
+        rm -f "/tmp/.X${display_number}-lock"
+        mkdir -p /tmp/.X11-unix
+        chmod 1777 /tmp/.X11-unix 2>/dev/null || true
+
         Xvfb "$DISPLAY" -screen 0 1024x768x24 -nolisten tcp -ac >/tmp/codex-xvfb.log 2>&1 &
-        sleep 0.2
-        bashio::log.info "Started X11 clipboard display on ${DISPLAY}"
+        for _ in $(seq 1 25); do
+            if [ -S "/tmp/.X11-unix/X${display_number}" ]; then
+                bashio::log.info "Started X11 clipboard display on ${DISPLAY}"
+                return
+            fi
+            sleep 0.2
+        done
+        bashio::log.warning "Xvfb did not become ready on ${DISPLAY}; native image paste bridge may fail"
     else
         bashio::log.warning "Xvfb is not installed; native Codex image paste bridge is disabled"
     fi
@@ -90,7 +103,7 @@ main() {
     export CODEX_VENDOR_DIR="/opt/codex-cli-ha/vendor"
     export CODEX_SERVER_HOST="0.0.0.0"
     export CODEX_SERVER_PORT="7681"
-    export CODEX_ADDON_VERSION="0.1.14"
+    export CODEX_ADDON_VERSION="0.1.15"
 
     init_environment
     load_openai_settings
