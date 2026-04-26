@@ -5,11 +5,9 @@ set -uo pipefail
 cd "${CODEX_WORKSPACE:-/config}" 2>/dev/null || cd /config || cd /
 
 echo "Codex CLI for Home Assistant"
-echo "Workspace: ${CODEX_WORKSPACE:-/config}"
-echo "Images: ${CODEX_IMAGE_DIR:-/tmp/codex-images-tmp}"
 echo
-echo "Paste or drop images into the browser panel to save them."
-echo "Use codex-image <image> \"prompt\" to start/resume Codex with an image."
+echo "Image paste: Alt+V -> Ctrl+V -> Insert Path"
+echo "If browser clipboard access is allowed, Alt+V inserts the image path directly."
 echo
 
 if [ "${CODEX_AUTO_LAUNCH:-true}" = "true" ]; then

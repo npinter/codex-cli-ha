@@ -245,7 +245,15 @@ async function normalizeImageForUpload(file) {
   return { file: converted, type: "image/png" };
 }
 
-async function uploadImage(file) {
+function insertImagePath(image) {
+  if (!image) return;
+  sendTerminal(image.path);
+  el.imagePanel.classList.add("hidden");
+  showToast("Image path inserted");
+  request("api/image/cleanup", { name: image.name }).catch(() => {});
+}
+
+async function uploadImage(file, options = {}) {
   const image = await normalizeImageForUpload(file);
   const formData = new FormData();
   formData.append("file", image.file, image.file.name || file.name || "pasted-image");
@@ -254,6 +262,10 @@ async function uploadImage(file) {
   const response = await requestForm("api/upload", formData);
   state.latestImage = response.image;
   renderImagePanel(response.image);
+  if (options.autoInsertPath) {
+    insertImagePath(response.image);
+    return;
+  }
   showToast("Image ready. Press Insert Path to use it.");
 }
 
@@ -271,13 +283,13 @@ function armPasteCapture(message) {
 
 async function requestImagePaste() {
   if (!navigator.clipboard?.read || !window.isSecureContext) {
-    armPasteCapture("Paste the image now with Ctrl+V or the browser paste action.");
+    armPasteCapture("Image paste: Alt+V -> Ctrl+V -> Insert Path.");
     return;
   }
-  await pasteImageFromClipboard(true);
+  await pasteImageFromClipboard(true, { autoInsertPath: true });
 }
 
-async function pasteImageFromClipboard(allowPasteFallback = false) {
+async function pasteImageFromClipboard(allowPasteFallback = false, options = {}) {
   try {
     const items = await navigator.clipboard.read();
     const files = [];
@@ -291,10 +303,10 @@ async function pasteImageFromClipboard(allowPasteFallback = false) {
       showToast("Clipboard does not contain an image");
       return;
     }
-    await handleFiles(files);
+    await handleFiles(files, options);
   } catch (error) {
     if (allowPasteFallback) {
-      armPasteCapture("Clipboard read was blocked. Paste the image now with Ctrl+V or the browser paste action.");
+      armPasteCapture("Clipboard read was blocked. Use Alt+V -> Ctrl+V -> Insert Path.");
       return;
     }
     showToast(`Browser clipboard read failed: ${error.message}`);
@@ -324,11 +336,11 @@ function collectImageFilesFromPaste(event) {
   return files;
 }
 
-async function handleFiles(files) {
+async function handleFiles(files, options = {}) {
   const images = Array.from(files || []).filter(isLikelyImageFile);
   if (!images.length) return;
   for (const image of images) {
-    await uploadImage(image);
+    await uploadImage(image, options);
   }
 }
 
@@ -363,11 +375,7 @@ el.dropZone.addEventListener("drop", (event) => {
 });
 
 el.insertPath.addEventListener("click", () => {
-  if (!state.latestImage) return;
-  sendTerminal(state.latestImage.path);
-  el.imagePanel.classList.add("hidden");
-  showToast("Image path inserted");
-  request("api/image/cleanup", { name: state.latestImage.name }).catch(() => {});
+  insertImagePath(state.latestImage);
 });
 
 el.closeImagePanel.addEventListener("click", () => el.imagePanel.classList.add("hidden"));

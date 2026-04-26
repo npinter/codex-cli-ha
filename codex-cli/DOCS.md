@@ -24,7 +24,7 @@ openai_organization: ""
 
 Paste or drop an image anywhere in the panel. The add-on captures browser paste events before xterm, saves the image under `codex_image_dir`, and shows a small preview with an `Insert Path` action.
 
-`Alt+V` / the paste icon uses the browser Clipboard API when available. If Home Assistant ingress or the browser blocks programmatic clipboard access, the page arms a paste target and asks you to paste with `Ctrl+V` or the browser paste action.
+`Alt+V` / the paste icon uses the browser Clipboard API when available and then inserts the image path directly. If Home Assistant ingress or the browser blocks programmatic clipboard access, use `Alt+V -> Ctrl+V -> Insert Path`.
 
 If the browser provides a clipboard image in a format Codex does not normally accept, such as BMP or TIFF, the page converts it to PNG before upload.
 

@@ -103,15 +103,13 @@ main() {
     export CODEX_VENDOR_DIR="/opt/codex-cli-ha/vendor"
     export CODEX_SERVER_HOST="0.0.0.0"
     export CODEX_SERVER_PORT="7681"
-    export CODEX_ADDON_VERSION="0.1.18"
+    export CODEX_ADDON_VERSION="0.1.19"
 
     init_environment
     load_openai_settings
     start_clipboard_display
 
     bashio::log.info "Starting Codex CLI web terminal on ${CODEX_SERVER_HOST}:${CODEX_SERVER_PORT}"
-    bashio::log.info "Workspace: ${CODEX_WORKSPACE}"
-    bashio::log.info "Image directory: ${CODEX_IMAGE_DIR}"
 
     exec python3 /opt/codex-cli-ha/scripts/server.py
 }
