@@ -27,7 +27,7 @@ Or add it manually:
 - Browser sign-in, device-code sign-in, and `auth.json` upload helpers for Codex authentication.
 - Header actions for Codex rate limits, image paste, Home Assistant YAML reload, and Home Assistant restart.
 - Mobile-friendly terminal controls for text size, arrow up/down keys, and tmux-backed terminal scrollback.
-- Docker build uses npm only in a build stage, then ships a reduced runtime image without npm, jq, curl, git, xclip, or Xvfb.
+- Docker build uses npm only in a build stage, then ships a Home Assistant base runtime without npm, jq, curl, git, xclip, or Xvfb.
 
 ## Image Paste
 
@@ -59,7 +59,27 @@ You can also use an API key in the add-on configuration.
 
 ## Security
 
-The add-on is intended to be reached through Home Assistant ingress. Its container service allows only loopback and the Supervisor ingress address by default, and it no longer publishes the terminal port directly on the host. The Docker image uses a minimal Alpine runtime and keeps npm/build tooling out of the final image.
+The add-on is intended to be reached through Home Assistant ingress. Its container service allows only loopback and the Supervisor ingress address by default, and it no longer publishes the terminal port directly on the host. The Docker image uses the Home Assistant Alpine base, strips inherited `jq`/`curl` utilities that are not needed at runtime, and keeps npm/build tooling out of the final image.
+
+For local testing when GHCR pulls are unavailable, build the Home Assistant base source once and tag it locally:
+
+```sh
+git clone --depth 1 https://github.com/home-assistant/docker-base.git /tmp/home-assistant-docker-base
+docker buildx build --load -t ghcr.io/home-assistant/base:3.23 /tmp/home-assistant-docker-base/alpine
+docker build -t codex-cli-ha:hardened codex-cli
+```
+
+To test auth locally, publish both the web terminal port and Codex's browser callback port:
+
+```sh
+docker run --rm -p 18788:7681 -p 1455:1455 \
+  -e CODEX_ALLOWED_CLIENTS='*' \
+  -v /tmp/codex-cli-ha-local-data:/data \
+  -v /tmp/codex-cli-ha-local-workspace:/config \
+  codex-cli-ha:hardened
+```
+
+Device-code sign-in is the most reliable flow when the browser callback port is not reachable from the machine running the browser.
 
 This is a high-trust add-on: Codex can edit files in the configured workspace, and the add-on uses the same Home Assistant API/auth permission class as comparable Claude Code terminal add-ons. The Supervisor token is kept in the Python wrapper process and is stripped from Codex/tmux child processes.
 

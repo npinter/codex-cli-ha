@@ -82,7 +82,7 @@ The Docker build pins Codex CLI with `CODEX_CLI_VERSION` and currently defaults 
 
 ## Security
 
-The web service is designed for Home Assistant ingress and allows only loopback plus the Supervisor ingress source address by default. The add-on does not publish its terminal port directly on the host. The runtime image is based on Alpine and omits npm, jq, curl, git, xclip, and Xvfb to reduce CVE exposure.
+The web service is designed for Home Assistant ingress and allows only loopback plus the Supervisor ingress source address by default. The add-on does not publish its terminal port directly on the host. The runtime image is based on the Home Assistant Alpine base and strips unneeded inherited `jq`/`curl` utilities while omitting npm, git, xclip, and Xvfb to reduce CVE exposure.
 
 The add-on uses the same Home Assistant API/auth permission class as comparable Claude Code terminal add-ons: Supervisor manager access, Home Assistant API access, and auth API access. The Supervisor token remains available only to the Python wrapper process and is stripped from Codex/tmux child processes.
 

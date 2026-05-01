@@ -1,4 +1,4 @@
-ARG BUILD_FROM=alpine:3.23
+ARG BUILD_FROM=ghcr.io/home-assistant/base:3.23
 FROM ${BUILD_FROM} AS builder
 
 SHELL ["/bin/ash", "-o", "pipefail", "-c"]
@@ -33,7 +33,12 @@ RUN apk add --no-cache \
     nano \
     nodejs \
     python3 \
-    tmux
+    tmux \
+    && for package in curl jq bind-tools xz; do \
+        if apk info -e "$package" >/dev/null 2>&1; then \
+            apk del --purge "$package"; \
+        fi; \
+    done
 
 WORKDIR /config
 

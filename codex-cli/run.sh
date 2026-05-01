@@ -3,7 +3,31 @@
 set -e
 set -o pipefail
 
-if [ -r /usr/lib/bashio/bashio ]; then
+load_s6_container_environment() {
+    local env_dir="${S6_CONTAINER_ENV_DIR:-/run/s6/container_environment}"
+    local file
+    local name
+    local value
+
+    [ -d "$env_dir" ] || return
+
+    for file in "$env_dir"/*; do
+        [ -f "$file" ] || continue
+        name="${file##*/}"
+        case "$name" in
+            CODEX_*|OPENAI_API_KEY|OPENAI_BASE_URL|OPENAI_ORG_ID) ;;
+            *) continue ;;
+        esac
+        if [ -z "${!name+x}" ]; then
+            value="$(cat "$file")"
+            export "${name}=${value}"
+        fi
+    done
+}
+
+load_s6_container_environment
+
+if [ -r /usr/lib/bashio/bashio ] && command -v jq >/dev/null 2>&1; then
     # shellcheck source=/dev/null
     source /usr/lib/bashio/bashio
 fi
@@ -94,8 +118,10 @@ config_value() {
 }
 
 init_environment() {
-    if [ -z "${CODEX_HOME:-}" ]; then
+    if [ -z "${HOME:-}" ]; then
         export HOME="/data/home"
+    fi
+    if [ -z "${CODEX_HOME:-}" ]; then
         export CODEX_HOME="${HOME}/.codex"
     fi
     export XDG_CONFIG_HOME="/data/.config"
