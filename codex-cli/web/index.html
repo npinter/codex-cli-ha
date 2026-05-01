@@ -67,8 +67,15 @@
       <aside id="authPanel" class="panel auth hidden">
         <div>
           <strong>Authentication</strong>
-          <p id="authState">Upload an existing Codex auth.json from another machine.</p>
+          <p id="authState">Choose a sign-in method.</p>
         </div>
+        <div class="auth-actions">
+          <button id="startBrowserLogin" type="button" class="primary"><i class="fa-solid fa-arrow-right-to-bracket" aria-hidden="true"></i> Sign in</button>
+          <button id="startDeviceLogin" type="button"><i class="fa-solid fa-keyboard" aria-hidden="true"></i> Device code</button>
+          <button id="cancelLogin" type="button" class="hidden"><i class="fa-solid fa-xmark" aria-hidden="true"></i> Cancel</button>
+        </div>
+        <a id="authOpenLink" class="auth-link hidden" href="#" target="_blank" rel="noopener noreferrer">Open sign-in page</a>
+        <p id="deviceCode" class="device-code hidden"></p>
         <form id="authUploadForm">
           <label>
             Codex auth.json

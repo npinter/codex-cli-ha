@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 import base64
-import cgi
 import hashlib
+import ipaddress
 import json
 import os
 import pty
@@ -16,6 +16,8 @@ import subprocess
 import threading
 import time
 import uuid
+from email.parser import BytesParser
+from email.policy import default as email_policy
 from urllib.error import HTTPError, URLError
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -63,6 +65,26 @@ IMAGE_EXTENSION_TYPES = {
     ".tif": "image/tiff",
     ".tiff": "image/tiff",
     ".webp": "image/webp",
+}
+
+DEFAULT_ALLOWED_CLIENTS = "127.0.0.1,::1,172.30.32.2"
+MAX_WS_FRAME_BYTES = 1024 * 1024
+SENSITIVE_CHILD_ENV_KEYS = {
+    "HASSIO_TOKEN",
+    "SUPERVISOR_TOKEN",
+}
+SECURITY_HEADERS = {
+    "Content-Security-Policy": (
+        "default-src 'self'; "
+        "connect-src 'self' ws: wss:; "
+        "font-src 'self'; "
+        "form-action 'self'; "
+        "img-src 'self' blob: data:; "
+        "script-src 'self'; "
+        "style-src 'self' 'unsafe-inline'"
+    ),
+    "Referrer-Policy": "no-referrer",
+    "X-Content-Type-Options": "nosniff",
 }
 
 
@@ -133,6 +155,43 @@ def infer_image_type(data, declared_mime, name):
     return declared
 
 
+def child_env(extra=None):
+    env = os.environ.copy()
+    for key in SENSITIVE_CHILD_ENV_KEYS:
+        env.pop(key, None)
+    if extra:
+        env.update(extra)
+    return env
+
+
+def parse_allowed_clients(value):
+    raw = value if value not in {None, ""} else DEFAULT_ALLOWED_CLIENTS
+    entries = [item.strip() for item in raw.split(",") if item.strip()]
+    allowed = {"allow_all": False, "addresses": set(), "networks": []}
+    for entry in entries:
+        if entry == "*":
+            allowed["allow_all"] = True
+            continue
+        try:
+            if "/" in entry:
+                allowed["networks"].append(ipaddress.ip_network(entry, strict=False))
+            else:
+                allowed["addresses"].add(ipaddress.ip_address(entry))
+        except ValueError:
+            continue
+    return allowed
+
+
+def client_is_allowed(host, allowed):
+    if allowed.get("allow_all"):
+        return True
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return address in allowed["addresses"] or any(address in network for network in allowed["networks"])
+
+
 def read_exact(sock, length):
     chunks = []
     remaining = length
@@ -174,6 +233,8 @@ class WebSocket:
             length = struct.unpack("!H", read_exact(self.sock, 2))[0]
         elif length == 127:
             length = struct.unpack("!Q", read_exact(self.sock, 8))[0]
+        if length > MAX_WS_FRAME_BYTES:
+            raise ConnectionError("WebSocket frame is too large")
         mask = read_exact(self.sock, 4) if masked else b""
         payload = read_exact(self.sock, length) if length else b""
         if masked:
@@ -231,16 +292,17 @@ class CodexAppServer:
         if self.proc is not None and self.proc.poll() is None:
             return
 
+        workspace = self.app.workspace if Path(self.app.workspace).exists() else "/"
         argv = ["codex", "app-server"]
         self.proc = subprocess.Popen(
             argv,
-            cwd=self.app.workspace,
+            cwd=workspace,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
             bufsize=1,
-            env=os.environ.copy(),
+            env=child_env(),
         )
         threading.Thread(target=self._read_stdout, name="codex-app-stdout", daemon=True).start()
         threading.Thread(target=self._read_stderr, name="codex-app-stderr", daemon=True).start()
@@ -336,12 +398,16 @@ class CodexAppServer:
         method = message.get("method")
         params = message.get("params") or {}
         if method == "account/login/completed":
+            success = bool(params.get("success"))
+            restarted = self.app.restart_terminal_session() if success else False
             self.app.set_auth_state(
                 {
                     "type": "completed",
-                    "success": params.get("success"),
+                    "success": success,
+                    "loginId": params.get("loginId"),
                     "error": params.get("error"),
                     "completedAt": now_ms(),
+                    "terminalRestarted": restarted,
                 }
             )
         elif method == "account/updated":
@@ -367,9 +433,12 @@ class App:
         self.clipboard_display = os.environ.get("CODEX_CLIPBOARD_DISPLAY") or os.environ.get("DISPLAY")
         self.font_size = env_int("CODEX_TERMINAL_FONT_SIZE", 14)
         self.version = os.environ.get("CODEX_ADDON_VERSION", "0.1.5")
+        self.allowed_clients = parse_allowed_clients(os.environ.get("CODEX_ALLOWED_CLIENTS"))
         self.codex = CodexAppServer(self)
         self.logs = queue.Queue(maxsize=200)
         self.auth_state = None
+        self.account_state = None
+        self.account_error = None
         self.rate_limits = None
         self.rate_limits_updated_at = None
         self.rate_limits_error = None
@@ -396,6 +465,9 @@ class App:
     def set_auth_state(self, state):
         self.auth_state = state
 
+    def client_allowed(self, host):
+        return client_is_allowed(host, self.allowed_clients)
+
     def set_rate_limits(self, rate_limits):
         self.rate_limits = rate_limits
         self.rate_limits_updated_at = now_ms()
@@ -414,6 +486,8 @@ class App:
             "version": self.version,
             "auth": self.auth_state,
             "authExists": (self.codex_home / "auth.json").exists(),
+            "account": self.account_state,
+            "accountError": self.account_error,
             "rateLimits": self.rate_limits,
             "rateLimitsSummary": self._rate_limits_summary(self.rate_limits),
             "rateLimitsUpdatedAt": self.rate_limits_updated_at,
@@ -483,8 +557,7 @@ class App:
         if not path.exists():
             return {"ok": False, "error": f"image file is unavailable: {path}"}
 
-        env = os.environ.copy()
-        env["DISPLAY"] = self.clipboard_display
+        env = child_env({"DISPLAY": self.clipboard_display})
         target = mime if mime in ALLOWED_IMAGE_TYPES else "image/png"
         try:
             proc = subprocess.Popen(
@@ -554,11 +627,78 @@ class App:
         self.set_auth_state({"type": "authJson", "path": str(auth_path), "uploadedAt": now_ms(), "restarted": restarted})
         return {"path": str(auth_path), "bytes": len(data), "keys": sorted(parsed.keys()), "terminalRestarted": restarted}
 
+    def read_account(self, refresh=False):
+        try:
+            self.codex.start()
+            result = self.codex.request("account/read", {"refreshToken": bool(refresh)}, timeout=30) or {}
+            self.account_state = result.get("account")
+            self.account_error = None
+            return {
+                "account": self.account_state,
+                "requiresOpenaiAuth": bool(result.get("requiresOpenaiAuth")),
+            }
+        except Exception as exc:
+            self.account_error = str(exc)
+            return {"account": None, "requiresOpenaiAuth": True, "error": str(exc)}
+
+    def start_account_login(self, payload):
+        login_type = str(payload.get("type") or "chatgpt")
+        if login_type not in {"chatgpt", "chatgptDeviceCode"}:
+            raise ValueError("Unsupported login type")
+        self._cancel_pending_login()
+        params = {"type": "chatgptDeviceCode"} if login_type == "chatgptDeviceCode" else {
+            "type": "chatgpt",
+            "codexStreamlinedLogin": True,
+        }
+        self.codex.start()
+        result = self.codex.request("account/login/start", params, timeout=30) or {}
+        state = {
+            "type": "login",
+            "status": "pending",
+            "loginType": result.get("type", login_type),
+            "loginId": result.get("loginId"),
+            "authUrl": result.get("authUrl"),
+            "verificationUrl": result.get("verificationUrl"),
+            "userCode": result.get("userCode"),
+            "startedAt": now_ms(),
+        }
+        self.set_auth_state(state)
+        return state
+
+    def cancel_account_login(self, payload):
+        login_id = payload.get("loginId") or (self.auth_state or {}).get("loginId")
+        if not login_id:
+            raise ValueError("No pending login to cancel")
+        self.codex.start()
+        result = self.codex.request("account/login/cancel", {"loginId": login_id}, timeout=10) or {}
+        state = {
+            "type": "login",
+            "status": result.get("status", "canceled"),
+            "loginId": login_id,
+            "canceledAt": now_ms(),
+        }
+        self.set_auth_state(state)
+        return state
+
+    def _cancel_pending_login(self):
+        if not isinstance(self.auth_state, dict):
+            return
+        if self.auth_state.get("type") != "login" or self.auth_state.get("status") != "pending":
+            return
+        login_id = self.auth_state.get("loginId")
+        if not login_id:
+            return
+        try:
+            self.codex.start()
+            self.codex.request("account/login/cancel", {"loginId": login_id}, timeout=5)
+        except Exception as exc:
+            self.add_log(f"failed to cancel stale login: {exc}")
+
     def restart_terminal_session(self):
         try:
             subprocess.run(
                 ["tmux", "kill-session", "-t", self.session_name],
-                env=os.environ.copy(),
+                env=child_env(),
                 timeout=10,
                 check=False,
             )
@@ -582,7 +722,7 @@ class App:
             try:
                 subprocess.run(
                     command,
-                    env=os.environ.copy(),
+                    env=child_env(),
                     timeout=5,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
@@ -698,10 +838,13 @@ class App:
     def _spawn_tmux(self):
         child_pid, pty_fd = pty.fork()
         if child_pid == 0:
-            env = os.environ.copy()
+            env = child_env()
             env.setdefault("TERM", "xterm-256color")
             env.setdefault("COLORTERM", "truecolor")
-            os.chdir(self.workspace)
+            try:
+                os.chdir(self.workspace)
+            except OSError:
+                os.chdir("/")
             command = [
                 "tmux",
                 "new-session",
@@ -741,6 +884,8 @@ class App:
                 app.add_log("%s - %s" % (self.client_address[0], fmt % args))
 
             def do_GET(self):
+                if not self._allow_request():
+                    return
                 parsed = urlparse(self.path)
                 path = parsed.path
                 if path in {"", "/"}:
@@ -763,6 +908,9 @@ class App:
                     self._serve_vendor_asset(path.removeprefix("/vendor/fontawesome/"))
                 elif path == "/api/state":
                     self._json(app.snapshot())
+                elif path == "/api/auth/status":
+                    refresh = parsed.query == "refresh=1"
+                    self._json({"ok": True, "result": app.read_account(refresh=refresh)})
                 elif path == "/api/rate-limits":
                     self._json({"ok": True, "result": app.read_rate_limits()})
                 elif path.startswith("/api/image/"):
@@ -773,6 +921,8 @@ class App:
                     self._json({"error": "Not found"}, HTTPStatus.NOT_FOUND)
 
             def do_POST(self):
+                if not self._allow_request():
+                    return
                 parsed = urlparse(self.path)
                 try:
                     if parsed.path == "/api/upload":
@@ -786,6 +936,10 @@ class App:
                             payload = self._read_json()
                             if parsed.path == "/api/image/cleanup":
                                 self._json({"ok": True, "result": app.schedule_uploaded_image_cleanup(payload)})
+                            elif parsed.path == "/api/auth/login/start":
+                                self._json({"ok": True, "result": app.start_account_login(payload)})
+                            elif parsed.path == "/api/auth/login/cancel":
+                                self._json({"ok": True, "result": app.cancel_account_login(payload)})
                             elif parsed.path == "/api/ha/reload-yaml":
                                 self._json({"ok": True, "result": app.home_assistant_action("reload_yaml")})
                             elif parsed.path == "/api/ha/restart":
@@ -796,6 +950,13 @@ class App:
                     app.add_log(f"request failed: {exc}")
                     self._json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
 
+            def _allow_request(self):
+                if app.client_allowed(self.client_address[0]):
+                    return True
+                app.add_log(f"blocked request from {self.client_address[0]}")
+                self._json({"error": "Forbidden"}, HTTPStatus.FORBIDDEN)
+                return False
+
             def _read_upload(self):
                 content_type = self.headers.get("Content-Type", "")
                 if not content_type.lower().startswith("multipart/form-data"):
@@ -803,27 +964,32 @@ class App:
                 length = int(self.headers.get("Content-Length", "0"))
                 if length > app.max_upload_bytes + 1024 * 1024:
                     raise ValueError("Request body is too large")
-                form = cgi.FieldStorage(
-                    fp=self.rfile,
-                    headers=self.headers,
-                    environ={
-                        "REQUEST_METHOD": "POST",
-                        "CONTENT_TYPE": content_type,
-                        "CONTENT_LENGTH": str(length),
-                    },
+                body = self.rfile.read(length)
+                message = BytesParser(policy=email_policy).parsebytes(
+                    b"Content-Type: "
+                    + content_type.encode("utf-8", errors="replace")
+                    + b"\r\nMIME-Version: 1.0\r\n\r\n"
+                    + body
                 )
-                item = form["file"] if "file" in form else None
-                if isinstance(item, list):
-                    item = item[0] if item else None
-                if item is None or not getattr(item, "file", None):
+                fields = {}
+                file_part = None
+                for part in message.iter_parts():
+                    field_name = part.get_param("name", header="content-disposition")
+                    if not field_name:
+                        continue
+                    if field_name == "file" and file_part is None:
+                        file_part = part
+                    else:
+                        fields.setdefault(field_name, part.get_content())
+                if file_part is None:
                     raise ValueError("Missing image upload file")
-                data = item.file.read()
+                data = file_part.get_payload(decode=True) or b""
                 if len(data) > app.max_upload_bytes:
                     raise ValueError(f"Image exceeds {app.max_upload_bytes // 1024 // 1024} MB limit")
                 return {
                     "bytes": data,
-                    "name": item.filename or form.getfirst("name") or "pasted-image",
-                    "type": getattr(item, "type", None) or form.getfirst("type") or "",
+                    "name": file_part.get_filename() or fields.get("name") or "pasted-image",
+                    "type": file_part.get_content_type() or fields.get("type") or "",
                 }
 
             def _read_json(self):
@@ -841,6 +1007,7 @@ class App:
                 self.send_header("Content-Type", "application/json; charset=utf-8")
                 self.send_header("Content-Length", str(len(data)))
                 self.send_header("Cache-Control", "no-store")
+                self._send_security_headers()
                 self.end_headers()
                 self.wfile.write(data)
 
@@ -853,8 +1020,13 @@ class App:
                 self.send_header("Content-Type", content_type)
                 self.send_header("Content-Length", str(len(data)))
                 self.send_header("Cache-Control", "no-store")
+                self._send_security_headers()
                 self.end_headers()
                 self.wfile.write(data)
+
+            def _send_security_headers(self):
+                for name, value in SECURITY_HEADERS.items():
+                    self.send_header(name, value)
 
             def _serve_vendor_asset(self, encoded_name):
                 name = unquote(encoded_name)

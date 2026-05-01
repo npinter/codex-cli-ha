@@ -243,6 +243,41 @@ button.control-button {
   line-height: 1.35;
 }
 
+.auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.auth-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.auth-link {
+  display: inline-block;
+  margin-top: 12px;
+  color: var(--ha-primary);
+  font-size: 13px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.device-code {
+  display: inline-block;
+  border: 1px solid var(--ha-divider);
+  border-radius: 4px;
+  padding: 8px 10px;
+  background: var(--ha-bg);
+  color: var(--ha-text) !important;
+  font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+  font-size: 16px !important;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
 .image-summary {
   display: grid;
   grid-template-columns: 76px 1fr;
@@ -308,7 +343,7 @@ button.control-button {
 }
 
 .hidden {
-  display: none;
+  display: none !important;
 }
 
 .paste-catcher {

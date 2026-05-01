@@ -1,7 +1,7 @@
 ---
 name: "Codex CLI"
 description: "Codex CLI terminal for Home Assistant with native image paste support"
-version: "0.1.25"
+version: "0.1.26"
 slug: "codex_cli"
 init: false
 
@@ -17,11 +17,6 @@ ingress_stream: true
 panel_icon: mdi:code-braces
 panel_title: "Codex CLI"
 panel_admin: true
-
-ports:
-  7681/tcp: 7681
-ports_description:
-  7681/tcp: "Codex CLI web terminal (not required for ingress)"
 
 options:
   auto_launch_codex: true
@@ -60,7 +55,6 @@ map:
 hassio_api: true
 hassio_role: manager
 homeassistant_api: true
+auth_api: true
 
 startup: services
-
-webui: http://[HOST]:[PORT:7681]/

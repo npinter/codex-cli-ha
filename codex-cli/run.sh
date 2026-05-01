@@ -1,7 +1,86 @@
-#!/usr/bin/with-contenv bashio
+#!/usr/bin/env bash
 
 set -e
 set -o pipefail
+
+if [ -r /usr/lib/bashio/bashio ]; then
+    # shellcheck source=/dev/null
+    source /usr/lib/bashio/bashio
+fi
+
+fallback_config_env_name() {
+    case "$1" in
+        auto_launch_codex) printf '%s' "CODEX_AUTO_LAUNCH" ;;
+        codex_workspace) printf '%s' "CODEX_WORKSPACE" ;;
+        codex_session_name) printf '%s' "CODEX_SESSION_NAME" ;;
+        codex_approval_policy) printf '%s' "CODEX_APPROVAL_POLICY" ;;
+        codex_sandbox) printf '%s' "CODEX_SANDBOX" ;;
+        codex_model) printf '%s' "CODEX_MODEL" ;;
+        codex_image_dir) printf '%s' "CODEX_IMAGE_DIR" ;;
+        codex_max_upload_mb) printf '%s' "CODEX_MAX_UPLOAD_MB" ;;
+        codex_image_cleanup_seconds) printf '%s' "CODEX_IMAGE_CLEANUP_SECONDS" ;;
+        terminal_font_size) printf '%s' "CODEX_TERMINAL_FONT_SIZE" ;;
+        openai_api_key) printf '%s' "OPENAI_API_KEY" ;;
+        openai_base_url) printf '%s' "OPENAI_BASE_URL" ;;
+        openai_organization) printf '%s' "OPENAI_ORG_ID" ;;
+        *) printf '%s' "" ;;
+    esac
+}
+
+fallback_config() {
+    local key="$1"
+    local default="$2"
+    local env_name
+    env_name="$(fallback_config_env_name "$key")"
+    if [ -n "$env_name" ] && [ -n "${!env_name+x}" ]; then
+        printf '%s' "${!env_name}"
+        return
+    fi
+    if [ -r /data/options.json ] && command -v python3 >/dev/null 2>&1; then
+        local value
+        value="$(python3 - "$key" <<'PY' 2>/dev/null || true
+import json
+import sys
+
+key = sys.argv[1]
+with open("/data/options.json", encoding="utf-8") as handle:
+    data = json.load(handle)
+value = data.get(key)
+if value is None:
+    raise SystemExit
+if isinstance(value, bool):
+    print("true" if value else "false")
+elif isinstance(value, (str, int, float)):
+    print(value)
+else:
+    print(json.dumps(value, separators=(",", ":")))
+PY
+)"
+        if [ -n "$value" ] && [ "$value" != "null" ]; then
+            printf '%s' "$value"
+            return
+        fi
+    fi
+    printf '%s' "$default"
+}
+
+if ! declare -F bashio::config >/dev/null 2>&1; then
+    bashio::config() {
+        fallback_config "$1" "${2:-}"
+    }
+fi
+
+if ! declare -F bashio::log.info >/dev/null 2>&1; then
+    bashio::log.info() {
+        printf '[info] %s\n' "$*"
+    }
+fi
+
+if ! declare -F bashio::log.warning >/dev/null 2>&1; then
+    bashio::log.warning() {
+        printf '[warning] %s\n' "$*" >&2
+    }
+fi
 
 config_value() {
     local key="$1"
@@ -15,8 +94,10 @@ config_value() {
 }
 
 init_environment() {
-    export HOME="/data/home"
-    export CODEX_HOME="${HOME}/.codex"
+    if [ -z "${CODEX_HOME:-}" ]; then
+        export HOME="/data/home"
+        export CODEX_HOME="${HOME}/.codex"
+    fi
     export XDG_CONFIG_HOME="/data/.config"
     export XDG_CACHE_HOME="/data/.cache"
     export XDG_STATE_HOME="/data/.local/state"
@@ -78,7 +159,7 @@ start_clipboard_display() {
         done
         bashio::log.warning "Xvfb did not become ready on ${DISPLAY}; native image paste bridge may fail"
     else
-        bashio::log.warning "Xvfb is not installed; native Codex image paste bridge is disabled"
+        bashio::log.info "Xvfb is not installed; browser image path insertion remains available"
     fi
 }
 
@@ -103,7 +184,7 @@ main() {
     export CODEX_VENDOR_DIR="/opt/codex-cli-ha/vendor"
     export CODEX_SERVER_HOST="0.0.0.0"
     export CODEX_SERVER_PORT="7681"
-    export CODEX_ADDON_VERSION="0.1.25"
+    export CODEX_ADDON_VERSION="0.1.26"
 
     init_environment
     load_openai_settings
