@@ -20,6 +20,11 @@ const el = {
   authPath: document.getElementById("authPath"),
   uploadAuthSubmit: document.getElementById("uploadAuthSubmit"),
   closeAuthPanel: document.getElementById("closeAuthPanel"),
+  startBrowserLogin: document.getElementById("startBrowserLogin"),
+  startDeviceLogin: document.getElementById("startDeviceLogin"),
+  cancelLogin: document.getElementById("cancelLogin"),
+  authOpenLink: document.getElementById("authOpenLink"),
+  deviceCode: document.getElementById("deviceCode"),
   fontDown: document.getElementById("fontDown"),
   fontSizeValue: document.getElementById("fontSizeValue"),
   fontUp: document.getElementById("fontUp"),
@@ -48,6 +53,7 @@ const state = {
   fontSize: storedFontSize || DEFAULT_FONT_SIZE,
   hasStoredFontSize: storedFontSize !== null,
   tmuxCopyModeActive: false,
+  authPollTimer: null,
 };
 
 const UPLOAD_IMAGE_TYPES = new Set(["image/gif", "image/jpeg", "image/png", "image/webp"]);
@@ -453,17 +459,122 @@ el.insertPath.addEventListener("click", () => {
 
 el.closeImagePanel.addEventListener("click", () => el.imagePanel.classList.add("hidden"));
 
+function resetAuthDetails() {
+  el.authOpenLink.classList.add("hidden");
+  el.authOpenLink.removeAttribute("href");
+  el.deviceCode.classList.add("hidden");
+  el.deviceCode.textContent = "";
+}
+
+function setAuthPending(pending) {
+  el.startBrowserLogin.disabled = pending;
+  el.startDeviceLogin.disabled = pending;
+  el.uploadAuthSubmit.disabled = pending;
+  el.cancelLogin.classList.toggle("hidden", !pending);
+}
+
 function renderAuth(auth) {
-  if (auth?.type === "authJson") {
-    el.authState.textContent = `auth.json uploaded to ${auth.path}`;
+  resetAuthDetails();
+  const pending = auth?.type === "login" && auth.status === "pending";
+  setAuthPending(pending);
+
+  if (pending) {
+    const directLogin = auth.loginType === "chatgpt";
+    el.authState.textContent = directLogin ? "Complete sign-in in the browser tab." : "Enter the device code in the browser.";
+    const url = auth.authUrl || auth.verificationUrl;
+    if (url) {
+      el.authOpenLink.href = url;
+      el.authOpenLink.textContent = directLogin ? "Open sign-in page" : "Open device authorization";
+      el.authOpenLink.classList.remove("hidden");
+    }
+    if (auth.userCode) {
+      el.deviceCode.textContent = auth.userCode;
+      el.deviceCode.classList.remove("hidden");
+    }
+    startAuthPolling();
+    return;
+  }
+
+  stopAuthPolling();
+  if (auth?.type === "completed") {
+    if (auth.success) {
+      const restarted = auth.terminalRestarted ? " Terminal session restarted." : "";
+      el.authState.textContent = `Sign-in completed.${restarted}`;
+      refreshRateLimit();
+    } else {
+      el.authState.textContent = auth.error || "Sign-in failed.";
+    }
+  } else if (auth?.type === "authJson") {
+    const restarted = auth.restarted ? " Terminal session restarted." : "";
+    el.authState.textContent = `auth.json uploaded to ${auth.path}.${restarted}`;
+  } else if (auth?.type === "login" && auth.status) {
+    el.authState.textContent = `Sign-in ${auth.status}.`;
   } else {
-    el.authState.textContent = JSON.stringify(auth || {});
+    el.authState.textContent = "Choose a sign-in method.";
+  }
+}
+
+function startAuthPolling() {
+  window.clearInterval(state.authPollTimer);
+  state.authPollTimer = window.setInterval(refreshAuthState, 2500);
+}
+
+function stopAuthPolling() {
+  window.clearInterval(state.authPollTimer);
+  state.authPollTimer = null;
+}
+
+async function refreshAuthState() {
+  const snapshot = await fetch(apiUrl("api/state")).then((response) => response.json());
+  renderAuth(snapshot.auth);
+}
+
+async function startLogin(type) {
+  el.authPanel.classList.remove("hidden");
+  const pendingWindow = type === "chatgpt" ? window.open("about:blank", "_blank") : null;
+  if (pendingWindow) {
+    pendingWindow.opener = null;
+  }
+  setAuthPending(true);
+  el.authState.textContent = type === "chatgpt" ? "Starting browser sign-in..." : "Starting device-code sign-in...";
+  try {
+    const response = await request("api/auth/login/start", { type });
+    const auth = response.result;
+    renderAuth(auth);
+    const authUrl = auth.authUrl || auth.verificationUrl;
+    if (pendingWindow && authUrl) {
+      pendingWindow.location.href = authUrl;
+    } else if (pendingWindow && !pendingWindow.closed) {
+      pendingWindow.close();
+    }
+  } catch (error) {
+    if (pendingWindow && !pendingWindow.closed) {
+      pendingWindow.close();
+    }
+    setAuthPending(false);
+    el.authState.textContent = error.message;
   }
 }
 
 el.uploadAuth.addEventListener("click", () => {
   el.authPanel.classList.remove("hidden");
-  el.authState.textContent = "Choose auth.json and upload it.";
+  refreshAuthState().catch(() => renderAuth(null));
+});
+
+el.startBrowserLogin.addEventListener("click", () => startLogin("chatgpt"));
+
+el.startDeviceLogin.addEventListener("click", () => startLogin("chatgptDeviceCode"));
+
+el.cancelLogin.addEventListener("click", async () => {
+  el.cancelLogin.disabled = true;
+  try {
+    const response = await request("api/auth/login/cancel", {});
+    renderAuth(response.result);
+  } catch (error) {
+    el.authState.textContent = error.message;
+  } finally {
+    el.cancelLogin.disabled = false;
+  }
 });
 
 el.pasteImage.addEventListener("click", () => requestImagePaste());

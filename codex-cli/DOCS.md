@@ -36,11 +36,13 @@ Existing add-on configs that still use the old `/data/codex-images` default are 
 
 The image panel only contains `Insert Path` and `Close`; it does not include a prompt box or auto-run action.
 
-The container installs `bubblewrap`, `xvfb`, and `xclip` for Codex sandboxing and the clipboard bridge.
+The runtime container installs only the packages needed to run Codex and the terminal service. Browser image paste still inserts saved file paths; the older X11 clipboard bridge is intentionally not installed in the hardened runtime image.
 
 ## Login
 
-Use `Upload auth.json` in the top bar. On a logged-in device, Codex usually stores this file at:
+Use the key button in the top bar to open authentication. `Sign in` starts Codex's browser OAuth flow. `Device code` starts the fallback device-code flow.
+
+You can also use `Upload auth.json` from the same panel. On a logged-in device, Codex usually stores this file at:
 
 ```text
 ~/.codex/auth.json
@@ -54,12 +56,15 @@ The add-on stores the uploaded file at:
 
 After uploading, the add-on restarts the persistent terminal session so Codex picks up the new credentials.
 
+After browser or device-code sign-in completes, the add-on also restarts the persistent terminal session so Codex picks up the new credentials.
+
 The upload uses a multipart file body, with the older base64 JSON path retained as a fallback.
 
 Device-code login can still be run inside the terminal if needed. API-key auth can be configured with `openai_api_key`.
 
 ## Header Actions
 
+- `Authentication`: Starts browser sign-in, device-code sign-in, or uploads an existing `auth.json`.
 - `Paste Image`: Reads an image from the browser clipboard and opens the image preview panel.
 - `Reload YAML`: Calls Home Assistant's `homeassistant.reload_all` action through the Supervisor proxy.
 - `Restart HA`: Restarts Home Assistant Core through the Supervisor API.
@@ -73,7 +78,13 @@ The scroll buttons control tmux copy-mode because Codex runs inside a persistent
 
 ## Codex CLI Version
 
-The Docker build installs Codex CLI with `npm install -g @openai/codex`.
+The Docker build pins Codex CLI with `CODEX_CLI_VERSION` and currently defaults to `@openai/codex@0.128.0`. npm is used only in the builder stage and is not present in the final runtime image.
+
+## Security
+
+The web service is designed for Home Assistant ingress and allows only loopback plus the Supervisor ingress source address by default. The add-on does not publish its terminal port directly on the host. The runtime image is based on the Home Assistant Alpine base and strips unneeded inherited `jq`/`curl` utilities while omitting npm, git, xclip, and Xvfb to reduce CVE exposure.
+
+The add-on uses the same Home Assistant API/auth permission class as comparable Claude Code terminal add-ons: Supervisor manager access, Home Assistant API access, and auth API access. The Supervisor token remains available only to the Python wrapper process and is stripped from Codex/tmux child processes.
 
 ## Persistence
 
