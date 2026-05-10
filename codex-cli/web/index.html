@@ -47,6 +47,12 @@
         </div>
       </nav>
 
+      <form id="mobileInputBar" class="mobile-input-bar hidden" autocomplete="off">
+        <label for="mobileInput" class="visually-hidden">Terminal input</label>
+        <input id="mobileInput" type="text" inputmode="text" enterkeyhint="send" autocomplete="off" autocapitalize="none" placeholder="Terminal input">
+        <button id="mobileInputSend" class="control-button" type="submit" aria-label="Send terminal input" title="Send"><i class="fa-solid fa-paper-plane" aria-hidden="true"></i></button>
+      </form>
+
       <section id="dropZone" class="drop-zone">
         <div id="terminal" class="terminal"></div>
         <div id="dropHint" class="drop-hint">Drop image to attach</div>

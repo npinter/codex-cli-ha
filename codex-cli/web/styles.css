@@ -87,6 +87,10 @@ button.primary {
   gap: 12px;
 }
 
+.companion-input .shell {
+  grid-template-rows: auto auto auto 1fr;
+}
+
 .topbar {
   display: flex;
   justify-content: space-between;
@@ -179,6 +183,43 @@ button.control-button {
   font-size: 14px;
   line-height: 1;
   touch-action: manipulation;
+}
+
+.mobile-input-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--ha-divider);
+  border-radius: 4px;
+  padding: 8px;
+  background: var(--ha-card);
+}
+
+.mobile-input-bar input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 38px;
+  border: 1px solid var(--ha-divider);
+  border-radius: 4px;
+  padding: 8px 10px;
+  background: var(--ha-bg);
+  color: var(--ha-text);
+}
+
+.mobile-input-bar input:focus {
+  outline: 2px solid var(--ha-primary);
+  outline-offset: 1px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .drop-zone {

@@ -36,6 +36,9 @@ const el = {
   scrollLineDown: document.getElementById("scrollLineDown"),
   scrollDown: document.getElementById("scrollDown"),
   scrollBottom: document.getElementById("scrollBottom"),
+  mobileInputBar: document.getElementById("mobileInputBar"),
+  mobileInput: document.getElementById("mobileInput"),
+  mobileInputSend: document.getElementById("mobileInputSend"),
   toast: document.getElementById("toast"),
   pasteCatcher: document.getElementById("pasteCatcher"),
 };
@@ -56,6 +59,7 @@ const state = {
   fontSize: storedFontSize || DEFAULT_FONT_SIZE,
   hasStoredFontSize: storedFontSize !== null,
   tmuxCopyModeActive: false,
+  mobileInputEnabled: false,
 };
 
 const UPLOAD_IMAGE_TYPES = new Set(["image/gif", "image/jpeg", "image/png", "image/webp"]);
@@ -104,6 +108,7 @@ const fit = new FitAddon.FitAddon();
 term.loadAddon(fit);
 term.open(el.terminal);
 disableTerminalTextHelpers();
+enableCompanionInput();
 renderFontSize();
 fit.fit();
 term.attachCustomKeyEventHandler((event) => {
@@ -133,6 +138,18 @@ function disableTerminalTextHelpers() {
   textarea.setAttribute("autocapitalize", "none");
   textarea.setAttribute("spellcheck", "false");
   textarea.spellcheck = false;
+}
+
+function isCompanionApp() {
+  return /Home Assistant|HomeAssistant|io\.homeassistant/i.test(navigator.userAgent || "");
+}
+
+function enableCompanionInput() {
+  if (!isCompanionApp()) return;
+  state.mobileInputEnabled = true;
+  document.body.classList.add("companion-input");
+  el.mobileInputBar.classList.remove("hidden");
+  window.requestAnimationFrame(resizeTerminal);
 }
 
 async function request(path, payload) {
@@ -181,24 +198,28 @@ function connectTerminal() {
   });
 }
 
-function sendTerminal(data) {
+function sendTerminal(data, options = {}) {
   if (!state.socket || state.socket.readyState !== WebSocket.OPEN) return;
   state.socket.send(JSON.stringify({ type: "input", data }));
-  term.focus();
+  if (options.focus !== false) {
+    term.focus();
+  }
 }
 
-function sendTerminalControl(action) {
+function sendTerminalControl(action, options = {}) {
   if (!state.socket || state.socket.readyState !== WebSocket.OPEN) return;
   state.socket.send(JSON.stringify({ type: "control", action }));
-  term.focus();
+  if (options.focus !== false) {
+    term.focus();
+  }
 }
 
-function sendUserInput(data) {
+function sendUserInput(data, options = {}) {
   if (state.tmuxCopyModeActive) {
     state.tmuxCopyModeActive = false;
-    sendTerminalControl("scroll_bottom");
+    sendTerminalControl("scroll_bottom", options);
   }
-  sendTerminal(data);
+  sendTerminal(data, options);
 }
 
 function resizeTerminal() {
@@ -593,6 +614,15 @@ el.authUploadForm.addEventListener("submit", async (event) => {
 
 el.closeAuthPanel.addEventListener("click", () => el.authPanel.classList.add("hidden"));
 
+el.mobileInputBar.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const value = el.mobileInput.value;
+  if (!value) return;
+  sendUserInput(`${value}\r`, { focus: false });
+  el.mobileInput.value = "";
+  el.mobileInput.focus();
+});
+
 el.fontDown.addEventListener("click", () => setTerminalFontSize(state.fontSize - 1, { persist: true }));
 el.fontUp.addEventListener("click", () => setTerminalFontSize(state.fontSize + 1, { persist: true }));
 
@@ -671,4 +701,8 @@ fetch(apiUrl("api/state"))
 connectTerminal();
 refreshRateLimit();
 window.setInterval(refreshRateLimit, 60000);
-term.focus();
+if (state.mobileInputEnabled) {
+  el.mobileInput.focus();
+} else {
+  term.focus();
+}
