@@ -153,10 +153,6 @@ p {
   padding-right: 0;
 }
 
-.text-size-group {
-  margin-left: auto;
-}
-
 .control-label,
 .font-size-value {
   color: var(--ha-secondary-text);
