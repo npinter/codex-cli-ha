@@ -571,6 +571,13 @@ class App:
         target = self.session_name
         if action == "scroll_up":
             commands = [["tmux", "copy-mode", "-u", "-t", target]]
+        elif action == "scroll_line_up":
+            commands = [
+                ["tmux", "copy-mode", "-t", target],
+                ["tmux", "send-keys", "-X", "-t", target, "scroll-up"],
+            ]
+        elif action == "scroll_line_down":
+            commands = [["tmux", "send-keys", "-X", "-t", target, "scroll-down"]]
         elif action == "scroll_down":
             commands = [["tmux", "send-keys", "-X", "-t", target, "page-down"]]
         elif action == "scroll_bottom":

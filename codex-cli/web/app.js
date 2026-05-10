@@ -32,6 +32,8 @@ const el = {
   keyUp: document.getElementById("keyUp"),
   keyDown: document.getElementById("keyDown"),
   scrollUp: document.getElementById("scrollUp"),
+  scrollLineUp: document.getElementById("scrollLineUp"),
+  scrollLineDown: document.getElementById("scrollLineDown"),
   scrollDown: document.getElementById("scrollDown"),
   scrollBottom: document.getElementById("scrollBottom"),
   toast: document.getElementById("toast"),
@@ -601,6 +603,20 @@ el.scrollUp.addEventListener("click", () => {
   term.scrollPages(-1);
   state.tmuxCopyModeActive = true;
   sendTerminalControl("scroll_up");
+  term.focus();
+});
+
+el.scrollLineUp.addEventListener("click", () => {
+  term.scrollLines(-1);
+  state.tmuxCopyModeActive = true;
+  sendTerminalControl("scroll_line_up");
+  term.focus();
+});
+
+el.scrollLineDown.addEventListener("click", () => {
+  term.scrollLines(1);
+  state.tmuxCopyModeActive = true;
+  sendTerminalControl("scroll_line_down");
   term.focus();
 });
 
