@@ -101,6 +101,7 @@ const term = new Terminal({
 const fit = new FitAddon.FitAddon();
 term.loadAddon(fit);
 term.open(el.terminal);
+disableTerminalTextHelpers();
 renderFontSize();
 fit.fit();
 term.attachCustomKeyEventHandler((event) => {
@@ -120,6 +121,16 @@ function wsUrl(path) {
 
 function apiUrl(path) {
   return new URL(path, baseUrl);
+}
+
+function disableTerminalTextHelpers() {
+  const textarea = el.terminal.querySelector(".xterm-helper-textarea");
+  if (!textarea) return;
+  textarea.setAttribute("autocomplete", "off");
+  textarea.setAttribute("autocorrect", "off");
+  textarea.setAttribute("autocapitalize", "none");
+  textarea.setAttribute("spellcheck", "false");
+  textarea.spellcheck = false;
 }
 
 async function request(path, payload) {
