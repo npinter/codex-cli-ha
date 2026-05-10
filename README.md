@@ -21,7 +21,7 @@ Or add it manually:
 
 - Persistent browser terminal backed by `tmux`.
 - Codex CLI installed during the Docker build.
-- Native browser image paste/drop support with a small preview panel.
+- Native browser image upload, paste, and drop support with a small preview panel.
 - Pasted images are saved under `/tmp/codex-images-tmp` and cleaned up after `Insert Path`.
 - The terminal page inserts the saved image path with `Insert Path`, or directly from `Alt+V` when browser clipboard access is allowed.
 - `auth.json` upload helper for copying an existing Codex login into the add-on.
@@ -33,7 +33,9 @@ Or add it manually:
 
 Paste or drop an image anywhere on the Codex CLI panel. The add-on captures the browser paste event before xterm, saves the image inside the container, and opens a small preview panel. Press `Insert Path` to place the saved image path into Codex.
 
-`Alt+V` / the paste icon uses the browser Clipboard API when available and then inserts the image path directly. If the browser blocks clipboard reads, use `Alt+V -> Ctrl+V -> Insert Path`.
+The paste icon opens an image upload dialog that works in browsers and the Home Assistant companion app.
+
+`Alt+V` uses the browser Clipboard API when available and then inserts the image path directly. If the browser blocks clipboard reads, use `Alt+V -> Ctrl+V -> Insert Path`.
 
 ## Authentication
 

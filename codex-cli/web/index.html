@@ -19,7 +19,7 @@
         </div>
         <div class="actions">
           <button id="uploadAuth" class="icon-button" type="button" aria-label="Upload auth.json" title="Upload auth.json"><i class="fa-solid fa-key" aria-hidden="true"></i></button>
-          <button id="pasteImage" class="icon-button" type="button" aria-label="Paste image" title="Paste image"><i class="fa-solid fa-paste" aria-hidden="true"></i></button>
+          <button id="pasteImage" class="icon-button" type="button" aria-label="Upload image" title="Upload image"><i class="fa-solid fa-paste" aria-hidden="true"></i></button>
           <button id="reloadYaml" class="icon-button" type="button" aria-label="Reload YAML" title="Reload YAML"><i class="fa-solid fa-rotate" aria-hidden="true"></i></button>
           <button id="restartHa" class="icon-button danger" type="button" aria-label="Restart Home Assistant" title="Restart Home Assistant"><i class="fa-solid fa-power-off" aria-hidden="true"></i></button>
         </div>
@@ -63,6 +63,23 @@
           <button id="closeImagePanel" type="button">Close</button>
         </div>
       </aside>
+
+      <section id="imageUploadPanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="imageUploadTitle">
+        <form id="imageUploadForm" class="modal-dialog">
+          <div>
+            <strong id="imageUploadTitle">Upload image</strong>
+            <p id="imageUploadState" class="hint">No image selected.</p>
+          </div>
+          <label>
+            Image file
+            <input id="imageUploadFile" name="imageUploadFile" type="file" accept="image/*,.avif,.bmp,.gif,.heic,.heif,.jpeg,.jpg,.png,.tif,.tiff,.webp">
+          </label>
+          <div class="panel-actions">
+            <button id="imageUploadSubmit" type="submit" class="primary">Upload</button>
+            <button id="closeImageUploadPanel" type="button">Close</button>
+          </div>
+        </form>
+      </section>
 
       <aside id="authPanel" class="panel auth hidden">
         <div>

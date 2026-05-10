@@ -293,6 +293,56 @@ button.control-button {
   margin-top: 12px;
 }
 
+.modal {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.52);
+  z-index: 30;
+}
+
+.modal-dialog {
+  width: min(430px, calc(100vw - 36px));
+  border: 1px solid var(--ha-divider);
+  border-radius: 4px;
+  padding: 16px;
+  background: var(--ha-card);
+  box-shadow: var(--ha-card-box-shadow, 0 2px 8px rgba(0, 0, 0, 0.36));
+}
+
+.modal-dialog p,
+.modal-dialog label {
+  color: var(--ha-secondary-text);
+  font-size: 13px;
+}
+
+.modal-dialog .hint {
+  color: var(--ha-secondary-text);
+  line-height: 1.35;
+}
+
+.modal-dialog label {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.modal-dialog input {
+  width: 100%;
+  border: 1px solid var(--ha-divider);
+  border-radius: 4px;
+  padding: 10px;
+  background: var(--ha-bg);
+  color: var(--ha-text);
+}
+
+.modal-dialog input:focus {
+  outline: 2px solid var(--ha-primary);
+  outline-offset: 1px;
+}
+
 .toast {
   position: fixed;
   left: 50%;

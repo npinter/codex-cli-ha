@@ -8,6 +8,12 @@ const el = {
   imagePath: document.getElementById("imagePath"),
   insertPath: document.getElementById("insertPath"),
   closeImagePanel: document.getElementById("closeImagePanel"),
+  imageUploadPanel: document.getElementById("imageUploadPanel"),
+  imageUploadForm: document.getElementById("imageUploadForm"),
+  imageUploadFile: document.getElementById("imageUploadFile"),
+  imageUploadState: document.getElementById("imageUploadState"),
+  imageUploadSubmit: document.getElementById("imageUploadSubmit"),
+  closeImageUploadPanel: document.getElementById("closeImageUploadPanel"),
   uploadAuth: document.getElementById("uploadAuth"),
   pasteImage: document.getElementById("pasteImage"),
   reloadYaml: document.getElementById("reloadYaml"),
@@ -247,6 +253,18 @@ function showToast(message) {
   showToast.timer = window.setTimeout(() => el.toast.classList.add("hidden"), 3500);
 }
 
+function openImageUploadPanel() {
+  el.imageUploadPanel.classList.remove("hidden");
+  el.imageUploadState.textContent = "No image selected.";
+}
+
+function closeImageUploadPanel() {
+  el.imageUploadPanel.classList.add("hidden");
+  el.imageUploadForm.reset();
+  el.imageUploadSubmit.disabled = false;
+  term.focus();
+}
+
 function normalizeImageType(type) {
   const mime = String(type || "").split(";", 1)[0].trim().toLowerCase();
   return IMAGE_TYPE_ALIASES.get(mime) || mime;
@@ -434,6 +452,12 @@ document.addEventListener("paste", (event) => {
   handleFiles(files).catch((error) => showToast(error.message));
 }, true);
 
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !el.imageUploadPanel.classList.contains("hidden")) {
+    closeImageUploadPanel();
+  }
+});
+
 el.dropZone.addEventListener("dragover", (event) => {
   event.preventDefault();
   el.dropZone.classList.add("dragging");
@@ -453,6 +477,43 @@ el.insertPath.addEventListener("click", () => {
 
 el.closeImagePanel.addEventListener("click", () => el.imagePanel.classList.add("hidden"));
 
+el.imageUploadFile.addEventListener("change", () => {
+  const files = Array.from(el.imageUploadFile.files || []);
+  const images = files.filter(isLikelyImageFile);
+  if (!files.length) {
+    el.imageUploadState.textContent = "No image selected.";
+  } else if (!images.length) {
+    el.imageUploadState.textContent = "Choose an image file.";
+  } else {
+    el.imageUploadState.textContent = images[0].name || "Image selected.";
+  }
+});
+
+el.imageUploadForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  el.imageUploadSubmit.disabled = true;
+  try {
+    const file = Array.from(el.imageUploadFile.files || []).find(isLikelyImageFile);
+    if (!file) {
+      throw new Error("Choose an image file first.");
+    }
+    el.imageUploadState.textContent = `Uploading ${file.name || "image"}...`;
+    await uploadImage(file);
+    closeImageUploadPanel();
+  } catch (error) {
+    el.imageUploadState.textContent = error.message;
+    el.imageUploadSubmit.disabled = false;
+  }
+});
+
+el.closeImageUploadPanel.addEventListener("click", () => closeImageUploadPanel());
+
+el.imageUploadPanel.addEventListener("click", (event) => {
+  if (event.target === el.imageUploadPanel) {
+    closeImageUploadPanel();
+  }
+});
+
 function renderAuth(auth) {
   if (auth?.type === "authJson") {
     el.authState.textContent = `auth.json uploaded to ${auth.path}`;
@@ -466,7 +527,7 @@ el.uploadAuth.addEventListener("click", () => {
   el.authState.textContent = "Choose auth.json and upload it.";
 });
 
-el.pasteImage.addEventListener("click", () => requestImagePaste());
+el.pasteImage.addEventListener("click", () => openImageUploadPanel());
 
 el.reloadYaml.addEventListener("click", async () => {
   el.reloadYaml.disabled = true;

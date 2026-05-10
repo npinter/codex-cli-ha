@@ -22,9 +22,11 @@ openai_organization: ""
 
 ## Image Paste
 
-Paste or drop an image anywhere in the panel. The add-on captures browser paste events before xterm, saves the image under `codex_image_dir`, and shows a small preview with an `Insert Path` action.
+Upload, paste, or drop an image anywhere in the panel. The add-on saves the image under `codex_image_dir` and shows a small preview with an `Insert Path` action.
 
-`Alt+V` / the paste icon uses the browser Clipboard API when available and then inserts the image path directly. If Home Assistant ingress or the browser blocks programmatic clipboard access, use `Alt+V -> Ctrl+V -> Insert Path`.
+The paste icon opens an image upload dialog that works in browsers and the Home Assistant companion app.
+
+`Alt+V` uses the browser Clipboard API when available and then inserts the image path directly. If Home Assistant ingress or the browser blocks programmatic clipboard access, use `Alt+V -> Ctrl+V -> Insert Path`.
 
 If the browser provides a clipboard image in a format Codex does not normally accept, such as BMP or TIFF, the page converts it to PNG before upload.
 
@@ -60,7 +62,7 @@ Device-code login can still be run inside the terminal if needed. API-key auth c
 
 ## Header Actions
 
-- `Paste Image`: Reads an image from the browser clipboard and opens the image preview panel.
+- `Paste Image`: Opens the image upload dialog.
 - `Reload YAML`: Calls Home Assistant's `homeassistant.reload_all` action through the Supervisor proxy.
 - `Restart HA`: Restarts Home Assistant Core through the Supervisor API.
 - `Rate limit`: Polls Codex app-server's `account/rateLimits/read` method every 60 seconds when credentials are available.
