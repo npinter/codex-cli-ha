@@ -18,9 +18,14 @@ RUN apk add --no-cache \
     xclip \
     xvfb
 
-RUN npm install -g @openai/codex \
+ARG BUILD_VERSION=dev
+RUN mkdir -p /opt/codex-cli-ha \
+    && echo "${BUILD_VERSION}" > /opt/codex-cli-ha/build-version \
+    && npm install -g @openai/codex \
     && codex --version \
-    && npm install --omit=dev --prefix /tmp/codex-cli-ha-web @xterm/xterm @xterm/addon-fit @fortawesome/fontawesome-free@6.7.2 \
+    && rm -rf /root/.npm
+
+RUN npm install --omit=dev --prefix /tmp/codex-cli-ha-web @xterm/xterm @xterm/addon-fit @fortawesome/fontawesome-free@6.7.2 \
     && mkdir -p /opt/codex-cli-ha/vendor \
     && cp /tmp/codex-cli-ha-web/node_modules/@xterm/xterm/css/xterm.css /opt/codex-cli-ha/vendor/xterm.css \
     && cp /tmp/codex-cli-ha-web/node_modules/@xterm/xterm/lib/xterm.js /opt/codex-cli-ha/vendor/xterm.js \

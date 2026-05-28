@@ -77,7 +77,7 @@ The scroll buttons control tmux copy-mode because Codex runs inside a persistent
 
 ## Codex CLI Version
 
-The Docker build installs Codex CLI with `npm install -g @openai/codex`.
+The Docker build installs Codex CLI with `npm install -g @openai/codex`. The install layer records the Home Assistant build version so dev updates rerun the install instead of reusing an older cached Codex layer.
 
 ## Persistence
 
