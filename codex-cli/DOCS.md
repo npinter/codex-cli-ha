@@ -71,7 +71,7 @@ Device-code login can still be run inside the terminal if needed. API-key auth c
 
 The control strip below the header provides runtime terminal text scaling, arrow up/down keys for command history, and tmux-backed terminal page/line scrollback buttons. Text size changes are stored in the browser, so the Home Assistant companion app can use a different size than desktop.
 
-In the Home Assistant companion app, the panel shows a separate terminal input bar. Text entered there is sent as a complete command line, which avoids mobile keyboard suggestion text being committed directly into xterm's hidden input field.
+In the Home Assistant companion app, the panel shows a separate terminal input bar. Text entered there is sent as a complete command line after first returning the terminal to the live prompt, which avoids mobile keyboard suggestion text being committed directly into xterm's hidden input field.
 
 The scroll buttons control tmux copy-mode because Codex runs inside a persistent tmux session. Press the bottom scroll button, or start typing, to return to the live prompt after scrolling back.
 

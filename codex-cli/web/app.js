@@ -216,10 +216,18 @@ function sendTerminalControl(action, options = {}) {
   }
 }
 
+function returnToTerminalInput(options = {}) {
+  term.scrollToBottom();
+  state.tmuxCopyModeActive = false;
+  sendTerminalControl("scroll_bottom", { focus: false });
+  if (options.focus !== false) {
+    term.focus();
+  }
+}
+
 function sendUserInput(data, options = {}) {
   if (state.tmuxCopyModeActive) {
-    state.tmuxCopyModeActive = false;
-    sendTerminalControl("scroll_bottom", options);
+    returnToTerminalInput(options);
   }
   sendTerminal(data, options);
 }
@@ -653,9 +661,10 @@ el.mobileInputBar.addEventListener("submit", (event) => {
   event.preventDefault();
   const value = el.mobileInput.value;
   if (!value) return;
+  returnToTerminalInput();
   sendUserInput(`${value}\r`, { focus: false });
   el.mobileInput.value = "";
-  el.mobileInput.focus();
+  window.setTimeout(() => el.mobileInput.focus(), 0);
 });
 
 el.fontDown.addEventListener("click", () => setTerminalFontSize(state.fontSize - 1, { persist: true }));
@@ -693,10 +702,7 @@ el.scrollDown.addEventListener("click", () => {
 });
 
 el.scrollBottom.addEventListener("click", () => {
-  term.scrollToBottom();
-  state.tmuxCopyModeActive = false;
-  sendTerminalControl("scroll_bottom");
-  term.focus();
+  returnToTerminalInput();
 });
 
 async function refreshRateLimit() {
