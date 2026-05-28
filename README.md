@@ -25,8 +25,9 @@ Or add it manually:
 - Pasted images are saved under `/tmp/codex-images-tmp` and cleaned up after `Insert Path`.
 - The terminal page inserts the saved image path with `Insert Path`, or directly from `Alt+V` when browser clipboard access is allowed.
 - `auth.json` upload helper for copying an existing Codex login into the add-on.
-- Header actions for Codex rate limits, image paste, Home Assistant YAML reload, and Home Assistant restart.
-- Mobile-friendly terminal controls for text size, arrow up/down keys, and tmux-backed terminal scrollback.
+- Header actions for remaining Codex rate-limit bars, image upload, Home Assistant YAML reload, and Home Assistant restart.
+- Mobile-friendly terminal controls for text size, arrow up/down keys, and tmux-backed page/line scrollback.
+- Companion-app input bar that sends complete command lines without mobile keyboard suggestions leaking into xterm.
 - Docker build installs Codex CLI with `npm install -g @openai/codex`.
 
 ## Image Paste
@@ -59,7 +60,7 @@ You can also use an API key in the add-on configuration.
 
 ## Home Assistant Actions
 
-`Reload YAML` calls Home Assistant's `homeassistant.reload_all` action through the Supervisor proxy. `Restart HA` restarts Home Assistant Core through the Supervisor API.
+`Reload YAML` calls Home Assistant's `homeassistant.reload_all` action through the Supervisor proxy. `Restart HA` restarts Home Assistant Core through the Supervisor API. The header shows remaining 5h and weekly Codex limits as compact color-coded bars.
 
 ## Credits
 

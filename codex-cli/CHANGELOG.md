@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.26 - 2026-05-28
 
 - Added an image upload dialog for browser and Home Assistant companion app use.
 - Kept keyboard image paste shortcuts and drag/drop image attachment support.
