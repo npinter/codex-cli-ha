@@ -13,6 +13,7 @@ RUN apk add --no-cache \
     nodejs \
     npm \
     python3 \
+    ripgrep \
     tmux \
     vim \
     xclip \
