@@ -6,3 +6,4 @@
 - Kept keyboard image paste shortcuts and drag/drop image attachment support.
 - Added line-by-line terminal scroll controls for finer mobile navigation.
 - Added a companion-app mobile input bar to avoid keyboard suggestion text being sent directly to xterm.
+- Replaced rate limit text with remaining-capacity bars for the 5h and weekly limits.

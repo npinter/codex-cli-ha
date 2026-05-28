@@ -19,6 +19,8 @@ const el = {
   reloadYaml: document.getElementById("reloadYaml"),
   restartHa: document.getElementById("restartHa"),
   rateLimit: document.getElementById("rateLimit"),
+  rateLimitPrimary: document.getElementById("rateLimitPrimary"),
+  rateLimitSecondary: document.getElementById("rateLimitSecondary"),
   authPanel: document.getElementById("authPanel"),
   authUploadForm: document.getElementById("authUploadForm"),
   authState: document.getElementById("authState"),
@@ -285,6 +287,39 @@ function showToast(message) {
   el.toast.classList.remove("hidden");
   window.clearTimeout(showToast.timer);
   showToast.timer = window.setTimeout(() => el.toast.classList.add("hidden"), 3500);
+}
+
+function clampPercent(value) {
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.max(0, Math.min(100, parsed));
+}
+
+function remainingPercent(limit) {
+  if (!limit || typeof limit !== "object") return null;
+  const used = clampPercent(limit.usedPercent);
+  return used === null ? null : 100 - used;
+}
+
+function renderRateLimitBar(fill, value, label) {
+  if (value === null) {
+    fill.style.width = "0%";
+    fill.parentElement.setAttribute("aria-label", `${label} rate limit unavailable`);
+    fill.parentElement.classList.add("unavailable");
+    return;
+  }
+  const rounded = Math.round(value);
+  fill.style.width = `${value}%`;
+  fill.parentElement.setAttribute("aria-label", `${label} rate limit ${rounded}% remaining`);
+  fill.parentElement.title = `${label}: ${rounded}% remaining`;
+  fill.parentElement.classList.remove("unavailable");
+}
+
+function renderRateLimits(rateLimits) {
+  const primary = rateLimits?.primary || null;
+  const secondary = rateLimits?.secondary || null;
+  renderRateLimitBar(el.rateLimitPrimary, remainingPercent(primary), "5h");
+  renderRateLimitBar(el.rateLimitSecondary, remainingPercent(secondary), "weekly");
 }
 
 function openImageUploadPanel() {
@@ -668,9 +703,9 @@ async function refreshRateLimit() {
   try {
     const response = await fetch(apiUrl("api/rate-limits")).then((item) => item.json());
     if (!response.ok) throw new Error(response.error || "Rate limit unavailable");
-    el.rateLimit.textContent = response.result.summary || "Rate limit: unavailable";
+    renderRateLimits(response.result?.rateLimits);
   } catch (error) {
-    el.rateLimit.textContent = "Rate limit: unavailable";
+    renderRateLimits(null);
   }
 }
 
@@ -678,7 +713,7 @@ fetch(apiUrl("api/state"))
   .then((response) => response.json())
   .then((snapshot) => {
     el.title.textContent = "Codex CLI";
-    el.rateLimit.textContent = snapshot.rateLimitsSummary || "Rate limit: loading...";
+    renderRateLimits(snapshot.rateLimits);
     if (!state.hasStoredFontSize) {
       setTerminalFontSize(snapshot.fontSize || DEFAULT_FONT_SIZE);
     } else {
@@ -695,7 +730,7 @@ fetch(apiUrl("api/state"))
   })
   .catch(() => {
     el.title.textContent = "Codex CLI";
-    el.rateLimit.textContent = "Rate limit: unavailable";
+    renderRateLimits(null);
   });
 
 connectTerminal();

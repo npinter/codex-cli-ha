@@ -65,7 +65,7 @@ Device-code login can still be run inside the terminal if needed. API-key auth c
 - `Paste Image`: Opens the image upload dialog.
 - `Reload YAML`: Calls Home Assistant's `homeassistant.reload_all` action through the Supervisor proxy.
 - `Restart HA`: Restarts Home Assistant Core through the Supervisor API.
-- `Rate limit`: Polls Codex app-server's `account/rateLimits/read` method every 60 seconds when credentials are available.
+- `Rate limit`: Shows remaining 5h and weekly Codex limits as stacked bars.
 
 ## Mobile Controls
 

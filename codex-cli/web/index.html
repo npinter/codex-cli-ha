@@ -15,7 +15,16 @@
       <header class="topbar">
         <div>
           <h1 id="title">Codex CLI</h1>
-          <p id="rateLimit" class="rate-limit">Rate limit: loading...</p>
+          <div id="rateLimit" class="rate-limit-bars" aria-label="Rate limits">
+            <div class="rate-limit-row">
+              <span class="rate-limit-label">5h</span>
+              <span class="rate-limit-track"><span id="rateLimitPrimary" class="rate-limit-fill"></span></span>
+            </div>
+            <div class="rate-limit-row">
+              <span class="rate-limit-label">weekly</span>
+              <span class="rate-limit-track"><span id="rateLimitSecondary" class="rate-limit-fill"></span></span>
+            </div>
+          </div>
         </div>
         <div class="actions">
           <button id="uploadAuth" class="icon-button" type="button" aria-label="Upload auth.json" title="Upload auth.json"><i class="fa-solid fa-key" aria-hidden="true"></i></button>
