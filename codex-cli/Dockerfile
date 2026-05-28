@@ -12,6 +12,7 @@ RUN apk add --no-cache \
     nano \
     nodejs \
     npm \
+    py3-yaml \
     python3 \
     ripgrep \
     tmux \

@@ -4,6 +4,7 @@
 
 - Added Git-backed Home Assistant YAML checkpoints with `/config/AGENTS.md` instructions and helper commands.
 - Added `ripgrep` so the container includes the `rg` search command.
+- Added PyYAML support for Python YAML parsing inside the container.
 
 ## 0.1.26 - 2026-05-28
 
