@@ -9,3 +9,4 @@
 - Made the companion-app Send action return to the live terminal prompt before sending the line.
 - Made dev add-on rebuilds refresh the Codex CLI install layer instead of reusing an older cached version.
 - Replaced rate limit text with remaining-capacity bars for the 5h and weekly limits.
+- Tightened the rate-limit bar layout and color-coded remaining capacity from red to green.

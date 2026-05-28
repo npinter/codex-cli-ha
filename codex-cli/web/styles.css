@@ -115,16 +115,16 @@ p {
 
 .rate-limit-bars {
   display: grid;
-  width: min(220px, 42vw);
+  width: min(176px, 34vw);
   gap: 5px;
   margin-top: 8px;
 }
 
 .rate-limit-row {
   display: grid;
-  grid-template-columns: 44px minmax(92px, 1fr);
+  grid-template-columns: 38px minmax(74px, 1fr);
   align-items: center;
-  gap: 8px;
+  gap: 4px;
 }
 
 .rate-limit-label {
@@ -148,7 +148,7 @@ p {
   width: 0;
   height: 100%;
   border-radius: inherit;
-  background: var(--ha-primary);
+  background: var(--rate-limit-color, var(--ha-primary));
   transition: width 180ms ease;
 }
 

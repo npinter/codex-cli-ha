@@ -309,15 +309,22 @@ function remainingPercent(limit) {
   return used === null ? null : 100 - used;
 }
 
+function rateLimitColor(value) {
+  const hue = Math.round((value / 100) * 120);
+  return `hsl(${hue}, 70%, 48%)`;
+}
+
 function renderRateLimitBar(fill, value, label) {
   if (value === null) {
     fill.style.width = "0%";
+    fill.style.removeProperty("--rate-limit-color");
     fill.parentElement.setAttribute("aria-label", `${label} rate limit unavailable`);
     fill.parentElement.classList.add("unavailable");
     return;
   }
   const rounded = Math.round(value);
   fill.style.width = `${value}%`;
+  fill.style.setProperty("--rate-limit-color", rateLimitColor(value));
   fill.parentElement.setAttribute("aria-label", `${label} rate limit ${rounded}% remaining`);
   fill.parentElement.title = `${label}: ${rounded}% remaining`;
   fill.parentElement.classList.remove("unavailable");
