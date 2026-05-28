@@ -15,6 +15,7 @@ codex_image_dir: /tmp/codex-images-tmp
 codex_max_upload_mb: 25
 codex_image_cleanup_seconds: 60
 terminal_font_size: 14
+config_git_tracking: true
 openai_api_key: ""
 openai_base_url: ""
 openai_organization: ""
@@ -78,6 +79,23 @@ The scroll buttons control tmux copy-mode because Codex runs inside a persistent
 ## Codex CLI Version
 
 The Docker build installs Codex CLI with `npm install -g @openai/codex`. The install layer records the Home Assistant build version so dev updates rerun the install instead of reusing an older cached Codex layer.
+
+## Config Git Tracking
+
+By default, the add-on initializes Git in `/config` on startup, writes `/config/AGENTS.md` if it is missing, and creates an initial Home Assistant config baseline commit. The managed tracking focuses on `*.yaml` and `*.yml` files and excludes `secrets.yaml` by default.
+
+Helper commands are available inside the terminal:
+
+```text
+ha-config-status
+ha-config-diff
+ha-config-checkpoint "short description"
+ha-config-restore <file> [ref]
+```
+
+`AGENTS.md` tells Codex to run `ha-config-status` before YAML edits, `ha-config-checkpoint` after YAML edits, and `ha-config-diff` before reloading Home Assistant YAML. The add-on does not run a background watcher, so checkpoints happen through the Codex instruction workflow and helper commands.
+
+Set `config_git_tracking: false` to skip the startup bootstrap.
 
 ## Persistence
 

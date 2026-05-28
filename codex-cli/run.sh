@@ -82,6 +82,19 @@ start_clipboard_display() {
     fi
 }
 
+bootstrap_config_git() {
+    if [ "$(config_value config_git_tracking true)" != "true" ]; then
+        bashio::log.info "Home Assistant config Git tracking is disabled"
+        return
+    fi
+
+    if /opt/codex-cli-ha/scripts/ha-config.sh bootstrap >/tmp/ha-config-bootstrap.log 2>&1; then
+        bashio::log.info "Home Assistant config Git tracking is ready"
+    else
+        bashio::log.warning "Home Assistant config Git tracking failed: $(cat /tmp/ha-config-bootstrap.log)"
+    fi
+}
+
 main() {
     local image_dir
     image_dir="$(config_value codex_image_dir /tmp/codex-images-tmp)"
@@ -110,6 +123,7 @@ main() {
     fi
 
     init_environment
+    bootstrap_config_git
     load_openai_settings
     start_clipboard_display
 

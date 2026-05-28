@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Added Git-backed Home Assistant YAML checkpoints with `/config/AGENTS.md` instructions and helper commands.
+
 ## 0.1.26 - 2026-05-28
 
 - Added an image upload dialog for browser and Home Assistant companion app use.

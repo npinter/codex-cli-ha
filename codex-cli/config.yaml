@@ -34,6 +34,7 @@ options:
   codex_max_upload_mb: 25
   codex_image_cleanup_seconds: 60
   terminal_font_size: 14
+  config_git_tracking: true
   openai_api_key: ""
   openai_base_url: ""
   openai_organization: ""
@@ -49,6 +50,7 @@ schema:
   codex_max_upload_mb: int?
   codex_image_cleanup_seconds: int?
   terminal_font_size: int?
+  config_git_tracking: bool?
   openai_api_key: password?
   openai_base_url: str?
   openai_organization: str?

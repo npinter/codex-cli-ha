@@ -28,6 +28,7 @@ Or add it manually:
 - Header actions for remaining Codex rate-limit bars, image upload, Home Assistant YAML reload, and Home Assistant restart.
 - Mobile-friendly terminal controls for text size, arrow up/down keys, and tmux-backed page/line scrollback.
 - Companion-app input bar that sends complete command lines without mobile keyboard suggestions leaking into xterm.
+- Git-backed YAML checkpoints for `/config`, with Codex instructions in `/config/AGENTS.md`.
 - Docker build installs Codex CLI with `npm install -g @openai/codex`.
 
 ## Image Paste
@@ -61,6 +62,12 @@ You can also use an API key in the add-on configuration.
 ## Home Assistant Actions
 
 `Reload YAML` calls Home Assistant's `homeassistant.reload_all` action through the Supervisor proxy. `Restart HA` restarts Home Assistant Core through the Supervisor API. The header shows remaining 5h and weekly Codex limits as compact color-coded bars.
+
+## Config Checkpoints
+
+On startup, the add-on initializes Git in `/config`, creates `/config/AGENTS.md` if missing, and commits an initial YAML baseline. Codex is instructed to run `ha-config-checkpoint` after YAML edits, so changes can be inspected with `ha-config-diff` and rolled back with `ha-config-restore <file>`.
+
+`secrets.yaml` is excluded by default.
 
 ## Credits
 
