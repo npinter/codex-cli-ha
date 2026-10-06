@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.27 - 2026-10-06
 
 - Run Codex without its background app-server daemon to avoid PID start-time detection failures in the Home Assistant container.
 - Update the Home Assistant base image to Alpine 3.24 and move build metadata into the Dockerfile to fix Node.js startup during add-on builds on Home Assistant 2026.8.
