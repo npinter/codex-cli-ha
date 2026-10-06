@@ -12,7 +12,10 @@ echo
 
 if [ "${CODEX_AUTO_LAUNCH:-true}" = "true" ]; then
     if command -v codex >/dev/null 2>&1; then
-        args=("-C" "${CODEX_WORKSPACE:-/config}")
+        # The Home Assistant add-on container cannot reliably provide the
+        # process metadata Codex uses to manage its shared app-server daemon.
+        # Keep the app server attached to the CLI process instead.
+        args=("--no-daemon" "-C" "${CODEX_WORKSPACE:-/config}")
         if [ -n "${CODEX_APPROVAL_POLICY:-}" ]; then
             args+=("-a" "${CODEX_APPROVAL_POLICY}")
         fi
@@ -28,6 +31,16 @@ if [ "${CODEX_AUTO_LAUNCH:-true}" = "true" ]; then
     else
         echo "codex command was not found. Starting a shell."
     fi
+fi
+
+# The login shell launched below is also used for manual Codex commands after
+# the TUI exits. Export the function so plain `codex`, resume, and fork use the
+# same mode there without changing the installed CLI binary.
+if command -v codex >/dev/null 2>&1; then
+    codex() {
+        command codex --no-daemon "$@"
+    }
+    export -f codex
 fi
 
 exec bash -l

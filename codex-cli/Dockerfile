@@ -1,5 +1,14 @@
-ARG BUILD_FROM
-FROM ${BUILD_FROM}
+FROM ghcr.io/home-assistant/base:3.24-2026.08.0
+
+ARG BUILD_VERSION=dev
+LABEL \
+    io.hass.version="${BUILD_VERSION}" \
+    io.hass.type="app" \
+    io.hass.arch="aarch64|amd64" \
+    org.opencontainers.image.title="Home Assistant Add-on: Codex CLI" \
+    org.opencontainers.image.description="Codex CLI terminal with native image paste support" \
+    org.opencontainers.image.source="https://github.com/npinter/codex-cli-ha" \
+    org.opencontainers.image.licenses="MIT"
 
 SHELL ["/bin/ash", "-o", "pipefail", "-c"]
 
@@ -20,7 +29,6 @@ RUN apk add --no-cache \
     xclip \
     xvfb
 
-ARG BUILD_VERSION=dev
 RUN mkdir -p /opt/codex-cli-ha \
     && echo "${BUILD_VERSION}" > /opt/codex-cli-ha/build-version \
     && npm install -g @openai/codex \

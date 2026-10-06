@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Run Codex without its background app-server daemon to avoid PID start-time detection failures in the Home Assistant container.
+- Update the Home Assistant base image to Alpine 3.24 and move build metadata into the Dockerfile to fix Node.js startup during add-on builds on Home Assistant 2026.8.
 - Added Git-backed Home Assistant YAML checkpoints with `/config/AGENTS.md` instructions and helper commands.
 - Added `ripgrep` so the container includes the `rg` search command.
 - Added PyYAML support for Python YAML parsing inside the container.

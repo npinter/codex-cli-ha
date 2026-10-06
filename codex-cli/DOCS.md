@@ -78,7 +78,7 @@ The scroll buttons control tmux copy-mode because Codex runs inside a persistent
 
 ## Codex CLI Version
 
-The Docker build installs Codex CLI with `npm install -g @openai/codex`. The install layer records the Home Assistant build version so dev updates rerun the install instead of reusing an older cached Codex layer.
+The Docker build uses the Home Assistant Alpine 3.24 base image and installs Codex CLI with `npm install -g @openai/codex`. The install layer records the Home Assistant build version so dev updates rerun the install instead of reusing an older cached Codex layer. The terminal starts Codex with `--no-daemon` because the Home Assistant add-on container does not reliably expose the process metadata required by Codex's shared app-server daemon. The shell opened after Codex exits applies the same flag to manual `codex` commands, including `resume` and `fork`.
 
 ## Config Git Tracking
 
