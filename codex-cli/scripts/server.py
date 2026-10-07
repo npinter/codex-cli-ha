@@ -16,7 +16,7 @@ import threading
 import time
 import uuid
 from email import policy
-from email.parser import BytesParser
+from email.parser import BytesHeaderParser
 from urllib.error import HTTPError, URLError
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -135,29 +135,50 @@ def infer_image_type(data, declared_mime, name):
 
 
 def parse_multipart_upload(content_type, body, max_upload_bytes):
-    if "\r" in content_type or "\n" in content_type:
+    media_type = content_type.split(";", 1)[0].strip().lower()
+    if "\r" in content_type or "\n" in content_type or media_type != "multipart/form-data":
         raise ValueError("Invalid multipart content type")
-    message = BytesParser(policy=policy.default).parsebytes(
-        b"Content-Type: " + content_type.encode("latin-1") + b"\r\n\r\n" + body
-    )
-    if message.get_content_type() != "multipart/form-data" or not message.is_multipart():
+
+    # Read the opening delimiter from the body so parsing does not depend on
+    # the Content-Type boundary parameter surviving an ingress proxy.
+    opening_end = body.find(b"\r\n")
+    delimiter = body[:opening_end]
+    if opening_end < 0 or not delimiter.startswith(b"--") or not 3 <= len(delimiter) <= 202:
         raise ValueError("Invalid multipart upload")
 
     file_part = None
     file_data = None
     fields = {}
-    for part in message.iter_parts():
-        if part.get_content_disposition() != "form-data" or part.is_multipart():
-            continue
-        field_name = part.get_param("name", header="content-disposition")
-        data = part.get_payload(decode=True)
-        if data is None:
-            continue
-        if field_name == "file" and file_part is None:
-            file_part = part
-            file_data = data
-        elif field_name in {"name", "type"} and field_name not in fields:
-            fields[field_name] = data.decode(part.get_content_charset() or "utf-8", errors="replace")
+    cursor = opening_end + 2
+    marker = b"\r\n" + delimiter
+    for _ in range(32):
+        header_end = body.find(b"\r\n\r\n", cursor)
+        if header_end < 0 or header_end - cursor > 65536:
+            raise ValueError("Invalid multipart upload")
+        part = BytesHeaderParser(policy=policy.default).parsebytes(body[cursor:header_end] + b"\r\n\r\n")
+        data_start = header_end + 4
+        data_end = body.find(marker, data_start)
+        while data_end >= 0:
+            suffix_start = data_end + len(marker)
+            suffix = body[suffix_start:suffix_start + 2]
+            if suffix in (b"\r\n", b"--"):
+                break
+            data_end = body.find(marker, suffix_start)
+        if data_end < 0:
+            raise ValueError("Invalid multipart upload")
+        data = body[data_start:data_end]
+        if part.get_content_disposition() == "form-data":
+            field_name = part.get_param("name", header="content-disposition")
+            if field_name == "file" and file_part is None:
+                file_part = part
+                file_data = data
+            elif field_name in {"name", "type"} and field_name not in fields:
+                fields[field_name] = data.decode(part.get_content_charset() or "utf-8", errors="replace")
+        if suffix == b"--":
+            break
+        cursor = suffix_start + 2
+    else:
+        raise ValueError("Invalid multipart upload")
 
     if file_part is None:
         raise ValueError("Missing image upload file")

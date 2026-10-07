@@ -1,4 +1,5 @@
 import importlib.util
+from io import BytesIO
 from pathlib import Path
 import unittest
 
@@ -31,7 +32,7 @@ def multipart(parts):
 
 class MultipartUploadTests(unittest.TestCase):
     def test_image_bytes_and_metadata_survive_browser_form(self):
-        image = b"\x89PNG\r\n\x1a\n\x00\xff\x80\r\nalmost--codex-cli-ha-test-boundary"
+        image = b"\x89PNG\r\n\x1a\n\x00\xff\x80\r\n--codex-cli-ha-test-boundaryx"
         body = multipart(
             [
                 ("file", "camera.png", "image/png", image),
@@ -41,6 +42,31 @@ class MultipartUploadTests(unittest.TestCase):
         )
 
         upload = server.parse_multipart_upload(CONTENT_TYPE, body, 1024)
+
+        self.assertEqual(upload, {"bytes": image, "name": "camera.png", "type": "image/png"})
+
+    def test_upload_uses_body_delimiter_when_header_boundary_is_missing_or_rewritten(self):
+        image = b"\x89PNG\r\n\x1a\n"
+        body = multipart([("file", "camera.png", "image/png", image)])
+
+        for content_type in ("multipart/form-data", "multipart/form-data; boundary=wrong"):
+            with self.subTest(content_type=content_type):
+                upload = server.parse_multipart_upload(content_type, body, 1024)
+                self.assertEqual(upload["bytes"], image)
+
+    def test_http_upload_handler_accepts_body_when_boundary_header_is_missing(self):
+        image = b"\x89PNG\r\n\x1a\n"
+        body = multipart([("file", "camera.png", "image/png", image)])
+        app = object.__new__(server.App)
+        app.max_upload_bytes = 1024
+        handler = object.__new__(app._handler())
+        handler.headers = {
+            "Content-Type": "multipart/form-data",
+            "Content-Length": str(len(body)),
+        }
+        handler.rfile = BytesIO(body)
+
+        upload = handler._read_upload()
 
         self.assertEqual(upload, {"bytes": image, "name": "camera.png", "type": "image/png"})
 
@@ -79,6 +105,9 @@ class MultipartUploadTests(unittest.TestCase):
         oversized = multipart([("file", "camera.png", "image/png", b"abcd")])
         with self.assertRaisesRegex(ValueError, "Image exceeds"):
             server.parse_multipart_upload(CONTENT_TYPE, oversized, 3)
+
+        with self.assertRaisesRegex(ValueError, "Invalid multipart upload"):
+            server.parse_multipart_upload(CONTENT_TYPE, b"not a multipart body", 1024)
 
 
 if __name__ == "__main__":

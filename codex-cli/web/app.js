@@ -45,6 +45,11 @@ const el = {
   pasteCatcher: document.getElementById("pasteCatcher"),
 };
 
+window.addEventListener("pageshow", () => {
+  el.imageUploadPanel.classList.add("hidden");
+  el.authPanel.classList.add("hidden");
+});
+
 const DEFAULT_FONT_SIZE = 14;
 const FONT_SIZE_KEY = "codex-cli-ha-terminal-font-size";
 const MIN_FONT_SIZE = 9;
@@ -736,7 +741,6 @@ fetch(apiUrl("api/state"))
       el.authPath.textContent = `Target path: ${snapshot.authPath}`;
     }
     if (snapshot.auth) {
-      el.authPanel.classList.remove("hidden");
       renderAuth(snapshot.auth);
     }
     resizeTerminal();
