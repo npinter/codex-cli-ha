@@ -55,7 +55,7 @@ The add-on stores the uploaded file at:
 
 Uploading `auth.json` restarts the persistent terminal session so Codex picks up the new credentials.
 
-The upload uses a multipart file body, with the older base64 JSON path retained as a fallback.
+The upload sends the file directly, with the older multipart and base64 JSON paths retained for compatibility.
 
 You can also use an API key in the add-on configuration.
 

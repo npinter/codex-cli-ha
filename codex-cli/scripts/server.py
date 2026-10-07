@@ -21,7 +21,7 @@ from urllib.error import HTTPError, URLError
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 from urllib.request import Request, urlopen
 
 try:
@@ -840,47 +840,95 @@ class App:
             def do_POST(self):
                 parsed = urlparse(self.path)
                 try:
-                    if parsed.path == "/api/upload":
+                    if parsed.path == "/api/upload/raw":
+                        payload = self._read_raw_upload(parsed.query, app.max_upload_bytes)
+                        self._json({"ok": True, "image": app.upload_image(payload)})
+                    elif parsed.path == "/api/auth/upload/raw":
+                        payload = self._read_raw_upload(parsed.query, 1024 * 1024)
+                        self._json({"ok": True, "result": app.upload_auth_json(payload)})
+                    elif parsed.path == "/api/upload":
                         payload = self._read_upload()
                         self._json({"ok": True, "image": app.upload_image(payload)})
+                    elif parsed.path == "/api/auth/upload":
+                        payload = self._read_upload()
+                        self._json({"ok": True, "result": app.upload_auth_json(payload)})
                     else:
-                        if parsed.path == "/api/auth/upload":
-                            payload = self._read_upload()
-                            self._json({"ok": True, "result": app.upload_auth_json(payload)})
+                        payload = self._read_json()
+                        if parsed.path == "/api/image/cleanup":
+                            self._json({"ok": True, "result": app.schedule_uploaded_image_cleanup(payload)})
+                        elif parsed.path == "/api/ha/reload-yaml":
+                            self._json({"ok": True, "result": app.home_assistant_action("reload_yaml")})
+                        elif parsed.path == "/api/ha/restart":
+                            self._json({"ok": True, "result": app.home_assistant_action("restart")})
                         else:
-                            payload = self._read_json()
-                            if parsed.path == "/api/image/cleanup":
-                                self._json({"ok": True, "result": app.schedule_uploaded_image_cleanup(payload)})
-                            elif parsed.path == "/api/ha/reload-yaml":
-                                self._json({"ok": True, "result": app.home_assistant_action("reload_yaml")})
-                            elif parsed.path == "/api/ha/restart":
-                                self._json({"ok": True, "result": app.home_assistant_action("restart")})
-                            else:
-                                self._json({"error": "Not found"}, HTTPStatus.NOT_FOUND)
+                            self._json({"error": "Not found"}, HTTPStatus.NOT_FOUND)
                 except Exception as exc:
                     app.add_log(f"request failed: {exc}")
                     self._json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+
+            def _read_raw_upload(self, query, max_upload_bytes):
+                data = self._read_body(max_upload_bytes)
+                params = parse_qs(query, keep_blank_values=True)
+                return {
+                    "bytes": data,
+                    "name": params.get("name", [""])[0],
+                    "type": params.get("type", [""])[0],
+                }
 
             def _read_upload(self):
                 content_type = self.headers.get("Content-Type", "")
                 if not content_type.lower().startswith("multipart/form-data"):
                     return self._read_json()
-                length = int(self.headers.get("Content-Length", "0"))
-                if length < 0 or length > app.max_upload_bytes + 1024 * 1024:
-                    raise ValueError("Request body is too large")
-                body = self.rfile.read(length)
-                if len(body) != length:
-                    raise ValueError("Incomplete multipart upload")
+                body = self._read_body(app.max_upload_bytes + 1024 * 1024)
                 return parse_multipart_upload(content_type, body, app.max_upload_bytes)
 
             def _read_json(self):
-                length = int(self.headers.get("Content-Length", "0"))
-                if length > app.max_upload_bytes + 1024 * 1024:
-                    raise ValueError("Request body is too large")
-                body = self.rfile.read(length)
+                body = self._read_body(app.max_upload_bytes + 1024 * 1024)
                 if not body:
                     return {}
                 return json.loads(body.decode("utf-8"))
+
+            def _read_body(self, max_bytes):
+                transfer_encoding = self.headers.get("Transfer-Encoding", "")
+                content_length = self.headers.get("Content-Length")
+                if transfer_encoding:
+                    if content_length is not None or transfer_encoding.strip().lower() != "chunked":
+                        raise ValueError("Unsupported request body framing")
+                    chunks = []
+                    total = 0
+                    for _ in range(65536):
+                        line = self.rfile.readline(8193)
+                        if not line.endswith(b"\r\n"):
+                            raise ValueError("Invalid chunked upload")
+                        try:
+                            size = int(line[:-2].split(b";", 1)[0], 16)
+                        except ValueError as exc:
+                            raise ValueError("Invalid chunked upload") from exc
+                        if size < 0 or total + size > max_bytes:
+                            raise ValueError("Request body is too large")
+                        if size == 0:
+                            for _ in range(32):
+                                trailer = self.rfile.readline(8193)
+                                if trailer == b"\r\n":
+                                    return b"".join(chunks)
+                                if not trailer.endswith(b"\r\n"):
+                                    raise ValueError("Invalid chunked upload")
+                            raise ValueError("Invalid chunked upload")
+                        chunk = self.rfile.read(size)
+                        if len(chunk) != size or self.rfile.read(2) != b"\r\n":
+                            raise ValueError("Incomplete file upload")
+                        chunks.append(chunk)
+                        total += size
+                    raise ValueError("Too many upload chunks")
+                if content_length is None:
+                    raise ValueError("Missing Content-Length or chunked Transfer-Encoding")
+                length = int(content_length)
+                if length < 0 or length > max_bytes:
+                    raise ValueError("Request body is too large")
+                body = self.rfile.read(length)
+                if len(body) != length:
+                    raise ValueError("Incomplete file upload")
+                return body
 
             def _json(self, payload, status=HTTPStatus.OK):
                 data = json.dumps(payload).encode("utf-8")

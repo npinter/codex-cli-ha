@@ -170,10 +170,14 @@ async function request(path, payload) {
   return data;
 }
 
-async function requestForm(path, formData) {
-  const response = await fetch(apiUrl(path), {
+async function requestFile(path, file, name, type = "") {
+  const url = apiUrl(path);
+  url.searchParams.set("name", name);
+  if (type) url.searchParams.set("type", type);
+  const response = await fetch(url, {
     method: "POST",
-    body: formData,
+    headers: { "Content-Type": "application/octet-stream" },
+    body: file,
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || response.statusText);
@@ -435,11 +439,8 @@ function insertImagePath(image) {
 
 async function uploadImage(file, options = {}) {
   const image = await normalizeImageForUpload(file);
-  const formData = new FormData();
-  formData.append("file", image.file, image.file.name || file.name || "pasted-image");
-  formData.append("name", image.file.name || file.name || "pasted-image");
-  formData.append("type", image.type);
-  const response = await requestForm("api/upload", formData);
+  const name = image.file.name || file.name || "pasted-image";
+  const response = await requestFile("api/upload/raw", image.file, name, image.type);
   state.latestImage = response.image;
   renderImagePanel(response.image);
   if (options.autoInsertPath) {
@@ -652,10 +653,7 @@ el.authUploadForm.addEventListener("submit", async (event) => {
       throw new Error("Choose an auth.json file first.");
     }
     el.authState.textContent = `Uploading ${file.name}...`;
-    const formData = new FormData();
-    formData.append("file", file, file.name || "auth.json");
-    formData.append("name", file.name || "auth.json");
-    const response = await requestForm("api/auth/upload", formData);
+    const response = await requestFile("api/auth/upload/raw", file, file.name || "auth.json");
     const restarted = response.result.terminalRestarted ? " Terminal session restarted." : "";
     el.authState.textContent = `auth.json uploaded to ${response.result.path}.${restarted}`;
     el.authFile.value = "";

@@ -1,4 +1,5 @@
 import importlib.util
+from http import HTTPStatus
 from io import BytesIO
 from pathlib import Path
 import unittest
@@ -28,6 +29,12 @@ def multipart(parts):
         body.extend(b"\r\n")
     body.extend(f"--{BOUNDARY}--\r\n".encode())
     return bytes(body)
+
+
+def chunked(data):
+    middle = len(data) // 2
+    chunks = (data[:middle], data[middle:])
+    return b"".join(f"{len(chunk):x}\r\n".encode() + chunk + b"\r\n" for chunk in chunks) + b"0\r\n\r\n"
 
 
 class MultipartUploadTests(unittest.TestCase):
@@ -70,6 +77,22 @@ class MultipartUploadTests(unittest.TestCase):
 
         self.assertEqual(upload, {"bytes": image, "name": "camera.png", "type": "image/png"})
 
+    def test_http_upload_handler_accepts_chunked_multipart_body(self):
+        image = b"\x89PNG\r\n\x1a\n"
+        body = multipart([("file", "camera.png", "image/png", image)])
+        app = object.__new__(server.App)
+        app.max_upload_bytes = 1024
+        handler = object.__new__(app._handler())
+        handler.headers = {
+            "Content-Type": CONTENT_TYPE,
+            "Transfer-Encoding": "chunked",
+        }
+        handler.rfile = BytesIO(chunked(body))
+
+        upload = handler._read_upload()
+
+        self.assertEqual(upload["bytes"], image)
+
     def test_auth_json_upload_keeps_file_contents(self):
         auth = b'{"tokens":{"access_token":"test"}}'
         body = multipart(
@@ -108,6 +131,80 @@ class MultipartUploadTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "Invalid multipart upload"):
             server.parse_multipart_upload(CONTENT_TYPE, b"not a multipart body", 1024)
+
+
+class RawUploadTests(unittest.TestCase):
+    def test_raw_image_and_auth_routes_receive_exact_file_bytes(self):
+        image = b"\x89PNG\r\n\x1a\n\x00\xff"
+        auth = b'{"tokens":{"access_token":"test"}}'
+        app = object.__new__(server.App)
+        app.max_upload_bytes = 1024
+        app.add_log = lambda line: self.fail(line)
+        received = []
+        app.upload_image = lambda payload: received.append(("image", payload)) or {"accepted": True}
+        app.upload_auth_json = lambda payload: received.append(("auth", payload)) or {"accepted": True}
+
+        for path, data in (
+            ("/api/upload/raw?name=front%20door.png&type=image%2Fpng", image),
+            ("/api/auth/upload/raw?name=auth.json", auth),
+        ):
+            with self.subTest(path=path):
+                handler = object.__new__(app._handler())
+                handler.path = path
+                handler.headers = {"Content-Length": str(len(data)), "Content-Type": "application/octet-stream"}
+                handler.rfile = BytesIO(data)
+                responses = []
+                handler._json = lambda payload, status=HTTPStatus.OK: responses.append((status, payload))
+                handler.do_POST()
+                self.assertEqual(responses, [(HTTPStatus.OK, {"ok": True, "image" if path.startswith("/api/upload") else "result": {"accepted": True}})])
+
+        self.assertEqual(received[0], ("image", {"bytes": image, "name": "front door.png", "type": "image/png"}))
+        self.assertEqual(received[1], ("auth", {"bytes": auth, "name": "auth.json", "type": ""}))
+
+    def test_raw_upload_rejects_oversized_and_incomplete_bodies(self):
+        app = object.__new__(server.App)
+        handler = object.__new__(app._handler())
+        handler.headers = {"Content-Length": "4"}
+        handler.rfile = BytesIO(b"abcd")
+        with self.assertRaisesRegex(ValueError, "too large"):
+            handler._read_raw_upload("", 3)
+
+        handler.rfile = BytesIO(b"ab")
+        with self.assertRaisesRegex(ValueError, "Incomplete file upload"):
+            handler._read_raw_upload("", 4)
+
+    def test_raw_upload_accepts_chunked_body_without_content_length(self):
+        auth = b'{"tokens":{"access_token":"test"}}'
+        app = object.__new__(server.App)
+        handler = object.__new__(app._handler())
+        handler.headers = {"Transfer-Encoding": "chunked"}
+        handler.rfile = BytesIO(chunked(auth))
+
+        upload = handler._read_raw_upload("name=auth.json", 1024)
+
+        self.assertEqual(upload, {"bytes": auth, "name": "auth.json", "type": ""})
+
+    def test_chunked_bodies_obey_size_and_framing_limits(self):
+        app = object.__new__(server.App)
+        handler = object.__new__(app._handler())
+        handler.headers = {"Transfer-Encoding": "chunked"}
+        handler.rfile = BytesIO(chunked(b"abcd"))
+        with self.assertRaisesRegex(ValueError, "too large"):
+            handler._read_raw_upload("", 3)
+
+        handler.headers["Content-Length"] = "4"
+        handler.rfile = BytesIO(chunked(b"abcd"))
+        with self.assertRaisesRegex(ValueError, "Unsupported request body framing"):
+            handler._read_raw_upload("", 1024)
+
+    def test_json_fallback_accepts_chunked_body(self):
+        app = object.__new__(server.App)
+        app.max_upload_bytes = 1024
+        handler = object.__new__(app._handler())
+        handler.headers = {"Transfer-Encoding": "chunked"}
+        handler.rfile = BytesIO(chunked(b'{"data":"test"}'))
+
+        self.assertEqual(handler._read_json(), {"data": "test"})
 
 
 if __name__ == "__main__":

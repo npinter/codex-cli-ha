@@ -31,7 +31,7 @@ The paste icon opens an image upload dialog that works in browsers and the Home 
 
 If the browser provides a clipboard image in a format Codex does not normally accept, such as BMP or TIFF, the page converts it to PNG before upload.
 
-Image uploads use multipart file bodies, with the older base64 JSON upload path retained as a fallback.
+Image uploads send the file directly, with the older multipart and base64 JSON paths retained for compatibility.
 
 Temporary image files are deleted after `codex_image_cleanup_seconds` once `Insert Path` is pressed.
 
@@ -57,7 +57,7 @@ The add-on stores the uploaded file at:
 
 After uploading, the add-on restarts the persistent terminal session so Codex picks up the new credentials.
 
-The upload uses a multipart file body, with the older base64 JSON path retained as a fallback.
+The upload sends the file directly, with the older multipart and base64 JSON paths retained for compatibility.
 
 Device-code login can still be run inside the terminal if needed. API-key auth can be configured with `openai_api_key`.
 
