@@ -119,7 +119,7 @@ main() {
     if [ -r /opt/codex-cli-ha/build-version ]; then
         export CODEX_ADDON_VERSION="$(cat /opt/codex-cli-ha/build-version)"
     else
-        export CODEX_ADDON_VERSION="0.1.27"
+        export CODEX_ADDON_VERSION="0.1.28"
     fi
 
     init_environment

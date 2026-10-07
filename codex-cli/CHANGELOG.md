@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.28 - 2026-10-07
 
 - Replace the removed Python `cgi` module with standard-library multipart parsing so the web terminal starts on Alpine 3.24 and image/auth uploads continue to work.
 
