@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Replace the removed Python `cgi` module with standard-library multipart parsing so the web terminal starts on Alpine 3.24 and image/auth uploads continue to work.
+
 ## 0.1.27 - 2026-10-06
 
 - Run Codex without its background app-server daemon to avoid PID start-time detection failures in the Home Assistant container.

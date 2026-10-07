@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import base64
-import cgi
 import hashlib
 import json
 import os
@@ -16,6 +15,8 @@ import subprocess
 import threading
 import time
 import uuid
+from email import policy
+from email.parser import BytesParser
 from urllib.error import HTTPError, URLError
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -131,6 +132,42 @@ def infer_image_type(data, declared_mime, name):
     if suffix_type:
         return suffix_type
     return declared
+
+
+def parse_multipart_upload(content_type, body, max_upload_bytes):
+    if "\r" in content_type or "\n" in content_type:
+        raise ValueError("Invalid multipart content type")
+    message = BytesParser(policy=policy.default).parsebytes(
+        b"Content-Type: " + content_type.encode("latin-1") + b"\r\n\r\n" + body
+    )
+    if message.get_content_type() != "multipart/form-data" or not message.is_multipart():
+        raise ValueError("Invalid multipart upload")
+
+    file_part = None
+    file_data = None
+    fields = {}
+    for part in message.iter_parts():
+        if part.get_content_disposition() != "form-data" or part.is_multipart():
+            continue
+        field_name = part.get_param("name", header="content-disposition")
+        data = part.get_payload(decode=True)
+        if data is None:
+            continue
+        if field_name == "file" and file_part is None:
+            file_part = part
+            file_data = data
+        elif field_name in {"name", "type"} and field_name not in fields:
+            fields[field_name] = data.decode(part.get_content_charset() or "utf-8", errors="replace")
+
+    if file_part is None:
+        raise ValueError("Missing image upload file")
+    if len(file_data) > max_upload_bytes:
+        raise ValueError(f"Image exceeds {max_upload_bytes // 1024 // 1024} MB limit")
+    return {
+        "bytes": file_data,
+        "name": file_part.get_filename() or fields.get("name") or "pasted-image",
+        "type": file_part.get("Content-Type") or fields.get("type") or "",
+    }
 
 
 def read_exact(sock, length):
@@ -808,30 +845,12 @@ class App:
                 if not content_type.lower().startswith("multipart/form-data"):
                     return self._read_json()
                 length = int(self.headers.get("Content-Length", "0"))
-                if length > app.max_upload_bytes + 1024 * 1024:
+                if length < 0 or length > app.max_upload_bytes + 1024 * 1024:
                     raise ValueError("Request body is too large")
-                form = cgi.FieldStorage(
-                    fp=self.rfile,
-                    headers=self.headers,
-                    environ={
-                        "REQUEST_METHOD": "POST",
-                        "CONTENT_TYPE": content_type,
-                        "CONTENT_LENGTH": str(length),
-                    },
-                )
-                item = form["file"] if "file" in form else None
-                if isinstance(item, list):
-                    item = item[0] if item else None
-                if item is None or not getattr(item, "file", None):
-                    raise ValueError("Missing image upload file")
-                data = item.file.read()
-                if len(data) > app.max_upload_bytes:
-                    raise ValueError(f"Image exceeds {app.max_upload_bytes // 1024 // 1024} MB limit")
-                return {
-                    "bytes": data,
-                    "name": item.filename or form.getfirst("name") or "pasted-image",
-                    "type": getattr(item, "type", None) or form.getfirst("type") or "",
-                }
+                body = self.rfile.read(length)
+                if len(body) != length:
+                    raise ValueError("Incomplete multipart upload")
+                return parse_multipart_upload(content_type, body, app.max_upload_bytes)
 
             def _read_json(self):
                 length = int(self.headers.get("Content-Length", "0"))
