@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.30 - 2026-10-07
 
 - Send image and auth.json uploads as direct file bodies to avoid the multipart upload failure seen through Home Assistant ingress.
 - Read chunked HTTP request bodies when ingress omits `Content-Length`, instead of treating uploads as empty.
